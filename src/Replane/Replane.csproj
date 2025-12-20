@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Replane</RootNamespace>
+    <AssemblyName>Replane</AssemblyName>
+
+    <!-- Package Info -->
+    <PackageId>Replane</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Replane</Authors>
+    <Description>Replane SDK for .NET - Feature flags and remote configuration client</Description>
+    <PackageTags>feature-flags;remote-config;configuration;replane</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/replane/replane-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <!-- No external dependencies - zero-dependency SDK -->
+  <!-- System.Text.Json is included in .NET 10 -->
+
+</Project>
