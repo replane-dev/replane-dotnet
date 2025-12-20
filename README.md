@@ -1,6 +1,6 @@
 # Replane .NET SDK
 
-Official .NET SDK for [Replane](https://replane.io) - Feature flags and remote configuration.
+Official .NET SDK for [Replane](https://replane.dev) - Feature flags and remote configuration.
 
 ## Installation
 
@@ -237,37 +237,37 @@ public void TestABTest()
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `BaseUrl` | `string` | required | Replane server URL |
-| `SdkKey` | `string` | required | SDK key for authentication |
-| `Context` | `ReplaneContext` | `null` | Default context for evaluations |
-| `Fallbacks` | `Dictionary<string, object?>` | `null` | Fallback values |
-| `Required` | `IReadOnlyList<string>` | `null` | Required config names |
-| `RequestTimeoutMs` | `int` | `2000` | HTTP request timeout |
-| `InitializationTimeoutMs` | `int` | `5000` | Initial connection timeout |
-| `RetryDelayMs` | `int` | `200` | Initial retry delay |
-| `InactivityTimeoutMs` | `int` | `30000` | SSE inactivity timeout |
-| `HttpClient` | `HttpClient` | `null` | Custom HttpClient |
-| `Debug` | `bool` | `false` | Enable debug logging |
+| Option                    | Type                          | Default  | Description                     |
+| ------------------------- | ----------------------------- | -------- | ------------------------------- |
+| `BaseUrl`                 | `string`                      | required | Replane server URL              |
+| `SdkKey`                  | `string`                      | required | SDK key for authentication      |
+| `Context`                 | `ReplaneContext`              | `null`   | Default context for evaluations |
+| `Fallbacks`               | `Dictionary<string, object?>` | `null`   | Fallback values                 |
+| `Required`                | `IReadOnlyList<string>`       | `null`   | Required config names           |
+| `RequestTimeoutMs`        | `int`                         | `2000`   | HTTP request timeout            |
+| `InitializationTimeoutMs` | `int`                         | `5000`   | Initial connection timeout      |
+| `RetryDelayMs`            | `int`                         | `200`    | Initial retry delay             |
+| `InactivityTimeoutMs`     | `int`                         | `30000`  | SSE inactivity timeout          |
+| `HttpClient`              | `HttpClient`                  | `null`   | Custom HttpClient               |
+| `Debug`                   | `bool`                        | `false`  | Enable debug logging            |
 
 ## Condition Operators
 
 The SDK supports the following condition operators for overrides:
 
-| Operator | Description |
-|----------|-------------|
-| `equals` | Exact match |
-| `in` | Value is in list |
-| `not_in` | Value is not in list |
-| `less_than` | Less than comparison |
-| `less_than_or_equal` | Less than or equal |
-| `greater_than` | Greater than comparison |
-| `greater_than_or_equal` | Greater than or equal |
-| `segmentation` | Percentage-based bucketing |
-| `and` | All conditions must match |
-| `or` | Any condition must match |
-| `not` | Negate a condition |
+| Operator                | Description                |
+| ----------------------- | -------------------------- |
+| `equals`                | Exact match                |
+| `in`                    | Value is in list           |
+| `not_in`                | Value is not in list       |
+| `less_than`             | Less than comparison       |
+| `less_than_or_equal`    | Less than or equal         |
+| `greater_than`          | Greater than comparison    |
+| `greater_than_or_equal` | Greater than or equal      |
+| `segmentation`          | Percentage-based bucketing |
+| `and`                   | All conditions must match  |
+| `or`                    | Any condition must match   |
+| `not`                   | Negate a condition         |
 
 ## Error Handling
 
@@ -302,13 +302,13 @@ catch (ReplaneException ex)
 
 See the [examples](./examples/) directory for complete working examples:
 
-| Example | Description |
-|---------|-------------|
-| [BasicUsage](./examples/BasicUsage/) | Simple console app with basic config reading |
-| [ConsoleWithOverrides](./examples/ConsoleWithOverrides/) | Context-based overrides and user segmentation |
-| [BackgroundWorker](./examples/BackgroundWorker/) | Long-running service with real-time config updates |
-| [WebApiIntegration](./examples/WebApiIntegration/) | ASP.NET Core Web API with middleware and DI |
-| [UnitTesting](./examples/UnitTesting/) | Unit testing with the in-memory test client |
+| Example                                                  | Description                                        |
+| -------------------------------------------------------- | -------------------------------------------------- |
+| [BasicUsage](./examples/BasicUsage/)                     | Simple console app with basic config reading       |
+| [ConsoleWithOverrides](./examples/ConsoleWithOverrides/) | Context-based overrides and user segmentation      |
+| [BackgroundWorker](./examples/BackgroundWorker/)         | Long-running service with real-time config updates |
+| [WebApiIntegration](./examples/WebApiIntegration/)       | ASP.NET Core Web API with middleware and DI        |
+| [UnitTesting](./examples/UnitTesting/)                   | Unit testing with the in-memory test client        |
 
 Each example is self-contained and can be copied and run independently.
 
