@@ -6,7 +6,7 @@ public class HashTests
     [InlineData("", 0x811C9DC5u)]  // Empty string should return offset basis
     [InlineData("a", 0xe40c292cu)]
     [InlineData("hello", 0x4f9f2cab)]
-    [InlineData("FNV", 0xa5c0c30a)]
+    [InlineData("FNV", 0xf5cfe2b9)]
     public void Hash32_KnownInputs_ReturnsExpectedHashes(string input, uint expected)
     {
         var result = Fnv1a.Hash32(input);
