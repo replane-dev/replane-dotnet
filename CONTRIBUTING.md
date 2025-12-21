@@ -59,7 +59,7 @@ dotnet run --project playground
 
 ## Reporting Issues
 
-Found a bug or have a feature request? Please open an issue on GitHub.
+Found a bug or have a feature request? Please [open an issue](https://github.com/replane-dev/replane-dotnet/issues) on GitHub.
 
 ## Community
 
