@@ -18,18 +18,18 @@ dotnet add package Replane
 ```csharp
 using Replane;
 
-// Create and connect the client
-await using var client = new ReplaneClient(new ReplaneClientOptions
+// Create and connect
+await using var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-replane-server.com",
     SdkKey = "your-sdk-key"
 });
 
-await client.ConnectAsync();
+await replane.ConnectAsync();
 
 // Get a config value
-var featureEnabled = client.Get<bool>("feature-enabled");
-var maxItems = client.Get<int>("max-items", defaultValue: 100);
+var featureEnabled = replane.Get<bool>("feature-enabled");
+var maxItems = replane.Get<int>("max-items", defaultValue: 100);
 ```
 
 ## Features
@@ -48,12 +48,12 @@ var maxItems = client.Get<int>("max-items", defaultValue: 100);
 
 ```csharp
 // Get typed config values
-var enabled = client.Get<bool>("feature-enabled");
-var limit = client.Get<int>("rate-limit");
-var apiKey = client.Get<string>("api-key");
+var enabled = replane.Get<bool>("feature-enabled");
+var limit = replane.Get<int>("rate-limit");
+var apiKey = replane.Get<string>("api-key");
 
 // With default values
-var timeout = client.Get<int>("timeout-ms", defaultValue: 5000);
+var timeout = replane.Get<int>("timeout-ms", defaultValue: 5000);
 ```
 
 ### Context-Based Overrides
@@ -70,7 +70,7 @@ var context = new ReplaneContext
 };
 
 // Get config with context
-var premiumFeature = client.Get<bool>("premium-feature", context);
+var premiumFeature = replane.Get<bool>("premium-feature", context);
 ```
 
 ### Default Context
@@ -78,7 +78,7 @@ var premiumFeature = client.Get<bool>("premium-feature", context);
 Set default context that's merged with per-call context:
 
 ```csharp
-var client = new ReplaneClient(new ReplaneClientOptions
+var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-server.com",
     SdkKey = "your-key",
@@ -96,13 +96,13 @@ Subscribe to config changes using the `ConfigChanged` event:
 
 ```csharp
 // Subscribe to all config changes
-client.ConfigChanged += (sender, e) =>
+replane.ConfigChanged += (sender, e) =>
 {
     Console.WriteLine($"Config '{e.ConfigName}' updated to: {e.Config.Value}");
 };
 
 // Filter for specific configs
-client.ConfigChanged += (sender, e) =>
+replane.ConfigChanged += (sender, e) =>
 {
     if (e.ConfigName == "feature-flag")
     {
@@ -116,9 +116,9 @@ void OnConfigChanged(object? sender, ConfigChangedEventArgs e)
     Console.WriteLine($"Config changed: {e.ConfigName}");
 }
 
-client.ConfigChanged += OnConfigChanged;
+replane.ConfigChanged += OnConfigChanged;
 // Later...
-client.ConfigChanged -= OnConfigChanged;
+replane.ConfigChanged -= OnConfigChanged;
 ```
 
 ### Fallback Values
@@ -126,7 +126,7 @@ client.ConfigChanged -= OnConfigChanged;
 Provide fallback values for when configs aren't loaded:
 
 ```csharp
-var client = new ReplaneClient(new ReplaneClientOptions
+var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-server.com",
     SdkKey = "your-key",
@@ -143,7 +143,7 @@ var client = new ReplaneClient(new ReplaneClientOptions
 Ensure specific configs are present on initialization:
 
 ```csharp
-var client = new ReplaneClient(new ReplaneClientOptions
+var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-server.com",
     SdkKey = "your-key",
@@ -151,7 +151,7 @@ var client = new ReplaneClient(new ReplaneClientOptions
 });
 
 // ConnectAsync will throw if required configs are missing
-await client.ConnectAsync();
+await replane.ConnectAsync();
 ```
 
 ## Testing
@@ -290,7 +290,7 @@ public void TestConfigChangeEvent()
 Enable debug logging to troubleshoot issues:
 
 ```csharp
-var client = new ReplaneClient(new ReplaneClientOptions
+var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-server.com",
     SdkKey = "your-key",
@@ -336,7 +336,7 @@ public class MyLogger : IReplaneLogger
     }
 }
 
-var client = new ReplaneClient(options, new MyLogger());
+var replane = new ReplaneClient(options, new MyLogger());
 ```
 
 ## Condition Operators
@@ -362,8 +362,8 @@ The SDK supports the following condition operators for overrides:
 ```csharp
 try
 {
-    await client.ConnectAsync();
-    var value = client.Get<string>("my-config");
+    await replane.ConnectAsync();
+    var value = replane.Get<string>("my-config");
 }
 catch (AuthenticationException)
 {
