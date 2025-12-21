@@ -395,6 +395,10 @@ See the [examples](./examples/) directory for complete working examples:
 
 Each example is self-contained and can be copied and run independently.
 
+## Community
+
+Have questions or want to discuss Replane? Join the conversation in [GitHub Discussions](https://github.com/orgs/replane-dev/discussions).
+
 ## License
 
 MIT
