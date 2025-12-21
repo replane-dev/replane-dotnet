@@ -2,6 +2,11 @@
 
 Official .NET SDK for [Replane](https://replane.dev) - Feature flags and remote configuration.
 
+[![NuGet](https://img.shields.io/nuget/v/Replane)](https://www.nuget.org/packages/Replane)
+[![CI](https://github.com/replane-dev/replane-dotnet/actions/workflows/ci.yml/badge.svg)](https://github.com/replane-dev/replane-dotnet/actions)
+[![License](https://img.shields.io/github/license/replane-dev/replane-dotnet)](https://github.com/replane-dev/replane-dotnet/blob/main/LICENSE)
+[![Community](https://img.shields.io/badge/discussions-join-blue?logo=github)](https://github.com/orgs/replane-dev/discussions)
+
 ## Installation
 
 ```bash
@@ -394,6 +399,10 @@ See the [examples](./examples/) directory for complete working examples:
 | [UnitTesting](./examples/UnitTesting/)                   | Unit testing with the in-memory test client        |
 
 Each example is self-contained and can be copied and run independently.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
 
 ## Community
 
