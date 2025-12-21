@@ -162,6 +162,13 @@ public sealed class InMemoryReplaneClient : IReplaneClient
         Close();
     }
 
+    /// <inheritdoc />
+    public ValueTask DisposeAsync()
+    {
+        Close();
+        return ValueTask.CompletedTask;
+    }
+
     /// <summary>
     /// Get all configs (for testing inspection).
     /// </summary>
