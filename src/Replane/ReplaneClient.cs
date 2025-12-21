@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -37,8 +38,7 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     private readonly bool _ownsHttpClient;
     private readonly IReplaneLogger _logger;
 
-    private readonly Dictionary<string, Config> _configs = new(StringComparer.Ordinal);
-    private readonly object _lock = new();
+    private readonly ConcurrentDictionary<string, Config> _configs = new(StringComparer.Ordinal);
 
     private bool _closed;
     private bool _initialized;
@@ -177,36 +177,35 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             _logger.LogDebug($"  Merged context: {FormatContext(mergedContext)}");
         }
 
-        lock (_lock)
+        // Get config from concurrent dictionary (lock-free read)
+        if (!_configs.TryGetValue(name, out var config))
         {
-            if (!_configs.TryGetValue(name, out var config))
+            if (defaultValue is not null || typeof(T).IsValueType)
             {
-                if (defaultValue is not null || typeof(T).IsValueType)
-                {
-                    _logger.LogDebug($"  Config \"{name}\" not found, returning default: {FormatValue(defaultValue)}");
-                    return defaultValue;
-                }
-                _logger.LogDebug($"  Config \"{name}\" not found, throwing ConfigNotFoundException");
-                throw new ConfigNotFoundException(name);
+                _logger.LogDebug($"  Config \"{name}\" not found, returning default: {FormatValue(defaultValue)}");
+                return defaultValue;
             }
-
-            _logger.LogDebug($"  Config \"{name}\" found, base value: {FormatValue(config.Value)}, overrides: {config.Overrides.Count}");
-
-            var (result, matchedOverrideIndex) = Evaluator.EvaluateConfigWithDetails(config, mergedContext, _logger);
-
-            if (matchedOverrideIndex >= 0)
-            {
-                _logger.LogDebug($"  Override #{matchedOverrideIndex} matched, returning: {FormatValue(result)}");
-            }
-            else
-            {
-                _logger.LogDebug($"  No override matched, returning base value: {FormatValue(result)}");
-            }
-
-            var converted = ConvertValue<T>(result);
-            _logger.LogDebug($"  Final value (converted to {typeof(T).Name}): {FormatValue(converted)}");
-            return converted;
+            _logger.LogDebug($"  Config \"{name}\" not found, throwing ConfigNotFoundException");
+            throw new ConfigNotFoundException(name);
         }
+
+        // Config is immutable (record), safe to use outside any lock
+        _logger.LogDebug($"  Config \"{name}\" found, base value: {FormatValue(config.Value)}, overrides: {config.Overrides.Count}");
+
+        var (result, matchedOverrideIndex) = Evaluator.EvaluateConfigWithDetails(config, mergedContext, _logger);
+
+        if (matchedOverrideIndex >= 0)
+        {
+            _logger.LogDebug($"  Override #{matchedOverrideIndex} matched, returning: {FormatValue(result)}");
+        }
+        else
+        {
+            _logger.LogDebug($"  No override matched, returning base value: {FormatValue(result)}");
+        }
+
+        var converted = ConvertValue<T>(result);
+        _logger.LogDebug($"  Final value (converted to {typeof(T).Name}): {FormatValue(converted)}");
+        return converted;
     }
 
     /// <summary>
@@ -493,42 +492,44 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             return;
         }
 
-        var configsCount = 0;
-
-        lock (_lock)
+        // Parse all configs first (outside any critical section)
+        var parsedConfigs = new List<Config>();
+        foreach (var configElement in configsElement.EnumerateArray())
         {
-            foreach (var configElement in configsElement.EnumerateArray())
-            {
-                var config = ConfigParser.ParseConfig(configElement);
-                _configs[config.Name] = config;
-                configsCount++;
-                _logger.LogDebug($"  Loaded config: {config.Name}");
-                _logger.LogDebug($"    Base value: {FormatValue(config.Value)}");
-                _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
-                for (var i = 0; i < config.Overrides.Count; i++)
-                {
-                    var ov = config.Overrides[i];
-                    _logger.LogDebug($"      Override #{i}: value={FormatValue(ov.Value)}, conditions={ov.Conditions.Count}");
-                }
-            }
-
-            // Check required configs
-            if (_options.Required != null)
-            {
-                var missing = _options.Required.Where(r => !_configs.ContainsKey(r)).ToList();
-                if (missing.Count > 0)
-                {
-                    _logger.LogDebug($"  Missing required configs: [{string.Join(", ", missing)}]");
-                    _initError = new ConfigNotFoundException($"Missing required configs: {string.Join(", ", missing)}");
-                }
-            }
-
-            _logger.LogDebug($"  Current configs in cache: [{string.Join(", ", _configs.Keys)}]");
+            var config = ConfigParser.ParseConfig(configElement);
+            parsedConfigs.Add(config);
         }
+
+        // Add parsed configs to concurrent dictionary (each operation is atomic)
+        foreach (var config in parsedConfigs)
+        {
+            _configs[config.Name] = config;
+            _logger.LogDebug($"  Loaded config: {config.Name}");
+            _logger.LogDebug($"    Base value: {FormatValue(config.Value)}");
+            _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
+            for (var i = 0; i < config.Overrides.Count; i++)
+            {
+                var ov = config.Overrides[i];
+                _logger.LogDebug($"      Override #{i}: value={FormatValue(ov.Value)}, conditions={ov.Conditions.Count}");
+            }
+        }
+
+        // Check required configs (reading from concurrent dictionary is safe)
+        if (_options.Required != null)
+        {
+            var missing = _options.Required.Where(r => !_configs.ContainsKey(r)).ToList();
+            if (missing.Count > 0)
+            {
+                _logger.LogDebug($"  Missing required configs: [{string.Join(", ", missing)}]");
+                _initError = new ConfigNotFoundException($"Missing required configs: {string.Join(", ", missing)}");
+            }
+        }
+
+        _logger.LogDebug($"  Current configs in cache: [{string.Join(", ", _configs.Keys)}]");
 
         _initialized = true;
         _initTcs.TrySetResult(true);
-        _logger.LogDebug($"Initialization complete: {configsCount} configs loaded");
+        _logger.LogDebug($"Initialization complete: {parsedConfigs.Count} configs loaded");
     }
 
     private void HandleConfigChange(JsonElement data)
@@ -545,23 +546,24 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             configElement = data;
         }
 
+        // Parse config first (outside any critical section)
         var config = ConfigParser.ParseConfig(configElement);
 
-        lock (_lock)
+        // Get previous value for logging (optional, TryGetValue is lock-free)
+        var hadPrevious = _configs.TryGetValue(config.Name, out var previousConfig);
+
+        // Update concurrent dictionary (atomic operation)
+        _configs[config.Name] = config;
+
+        _logger.LogDebug($"  Config \"{config.Name}\" updated:");
+        if (hadPrevious)
         {
-            var hadPrevious = _configs.TryGetValue(config.Name, out var previousConfig);
-            _configs[config.Name] = config;
-
-            _logger.LogDebug($"  Config \"{config.Name}\" updated:");
-            if (hadPrevious)
-            {
-                _logger.LogDebug($"    Previous base value: {FormatValue(previousConfig!.Value)}");
-            }
-            _logger.LogDebug($"    New base value: {FormatValue(config.Value)}");
-            _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
+            _logger.LogDebug($"    Previous base value: {FormatValue(previousConfig!.Value)}");
         }
+        _logger.LogDebug($"    New base value: {FormatValue(config.Value)}");
+        _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
 
-        // Raise event outside the lock to avoid deadlocks
+        // Raise event
         OnConfigChanged(config);
 
         _logger.LogDebug($"Config change processed: {config.Name}");

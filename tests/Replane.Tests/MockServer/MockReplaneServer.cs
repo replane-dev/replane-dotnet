@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -13,9 +14,8 @@ public sealed class MockReplaneServer : IAsyncDisposable
     private readonly HttpListener _listener;
     private readonly CancellationTokenSource _cts = new();
     private Task? _listenerTask;
-    private readonly List<Config> _configs = [];
-    private readonly List<TaskCompletionSource<bool>> _sseConnections = [];
-    private readonly object _lock = new();
+    private readonly ConcurrentBag<Config> _configs = [];
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<bool>> _sseConnections = new();
 
     public string BaseUrl { get; }
     public string SdkKey { get; } = "test-sdk-key";
@@ -77,10 +77,7 @@ public sealed class MockReplaneServer : IAsyncDisposable
     /// </summary>
     public void AddConfig(Config config)
     {
-        lock (_lock)
-        {
-            _configs.Add(config);
-        }
+        _configs.Add(config);
     }
 
     /// <summary>
@@ -124,12 +121,10 @@ public sealed class MockReplaneServer : IAsyncDisposable
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
         while (DateTime.UtcNow < deadline)
         {
-            lock (_lock)
+            // ConcurrentDictionary.Count is thread-safe
+            if (!_sseConnections.IsEmpty)
             {
-                if (_sseConnections.Count > 0)
-                {
-                    return;
-                }
+                return;
             }
             await Task.Delay(10);
         }
@@ -211,11 +206,9 @@ public sealed class MockReplaneServer : IAsyncDisposable
         response.Headers.Add("Cache-Control", "no-cache");
         response.Headers.Add("Connection", "keep-alive");
 
+        var connectionId = Guid.NewGuid();
         var connectionTcs = new TaskCompletionSource<bool>();
-        lock (_lock)
-        {
-            _sseConnections.Add(connectionTcs);
-        }
+        _sseConnections[connectionId] = connectionTcs;
 
         try
         {
@@ -228,12 +221,8 @@ public sealed class MockReplaneServer : IAsyncDisposable
                 await Task.Delay(InitDelay, _cts.Token);
             }
 
-            // Send init event
-            List<Config> configsCopy;
-            lock (_lock)
-            {
-                configsCopy = _configs.ToList();
-            }
+            // Get snapshot of configs (ConcurrentBag.ToArray is thread-safe)
+            var configsCopy = _configs.ToArray();
 
             var initData = new
             {
@@ -266,10 +255,7 @@ public sealed class MockReplaneServer : IAsyncDisposable
         }
         finally
         {
-            lock (_lock)
-            {
-                _sseConnections.Remove(connectionTcs);
-            }
+            _sseConnections.TryRemove(connectionId, out _);
         }
     }
 
