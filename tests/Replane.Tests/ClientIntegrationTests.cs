@@ -1,9 +1,12 @@
 using Replane.Tests.MockServer;
+using System.Text.Json;
 
 namespace Replane.Tests;
 
 public class ClientIntegrationTests : IAsyncLifetime
 {
+    // Helper to convert object to JsonElement for tests
+    private static JsonElement ToJson(object? value) => JsonValueConverter.ToJsonElement(value);
     private MockReplaneServer _server = null!;
 
     public async Task InitializeAsync()
@@ -91,7 +94,7 @@ public class ClientIntegrationTests : IAsyncLifetime
         var config = new Config
         {
             Name = "premium-feature",
-            Value = false,
+            Value = ToJson(false),
             Overrides =
             [
                 new Override
@@ -106,7 +109,7 @@ public class ClientIntegrationTests : IAsyncLifetime
                             Expected = new List<object?> { "premium", "enterprise" }
                         }
                     ],
-                    Value = true
+                    Value = ToJson(true)
                 }
             ]
         };
@@ -135,7 +138,7 @@ public class ClientIntegrationTests : IAsyncLifetime
         var config = new Config
         {
             Name = "test-config",
-            Value = "default",
+            Value = ToJson("default"),
             Overrides =
             [
                 new Override
@@ -146,7 +149,7 @@ public class ClientIntegrationTests : IAsyncLifetime
                         new PropertyCondition { Op = "equals", Property = "region", Expected = "us" },
                         new PropertyCondition { Op = "equals", Property = "plan", Expected = "pro" }
                     ],
-                    Value = "us-pro"
+                    Value = ToJson("us-pro")
                 }
             ]
         };

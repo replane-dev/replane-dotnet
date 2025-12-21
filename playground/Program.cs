@@ -62,6 +62,13 @@ try
     var premiumFeature = client.Get<bool>("premium-feature", context: context, defaultValue: false);
     Console.WriteLine($"premium-feature (for premium user) = {premiumFeature}");
 
+    // Try getting a complex config
+    Console.WriteLine();
+    Console.WriteLine("--- Getting complex config ---");
+
+    var greetingConfig = client.Get<GreetingConfig>("hello", defaultValue: new GreetingConfig { Greeting = "Hello, world!" });
+    Console.WriteLine($"greeting = {greetingConfig?.Greeting ?? "<null>"}");
+
     // Keep running to receive config updates
     Console.WriteLine();
     Console.WriteLine("Listening for config changes... Press Ctrl+C to exit.");
@@ -97,4 +104,9 @@ catch (ReplaneTimeoutException ex)
 catch (Exception ex)
 {
     Console.WriteLine($"ERROR: {ex.GetType().Name}: {ex.Message}");
+}
+
+class GreetingConfig
+{
+    public string? Greeting { get; set; }
 }

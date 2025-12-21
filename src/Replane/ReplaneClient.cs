@@ -18,6 +18,11 @@ public sealed class ConfigChangedEventArgs : EventArgs
     /// The updated config with its new value and overrides.
     /// </summary>
     public required Config Config { get; init; }
+
+    /// <summary>
+    /// Gets the base value deserialized to the specified type.
+    /// </summary>
+    public T? GetValue<T>() => Config.GetValue<T>();
 }
 
 /// <summary>
@@ -97,7 +102,8 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
         {
             foreach (var (name, value) in options.Fallbacks)
             {
-                _configs[name] = new Config { Name = name, Value = value };
+                var jsonValue = JsonValueConverter.ToJsonElement(value);
+                _configs[name] = new Config { Name = name, Value = jsonValue };
                 _logger.LogDebug($"  Registered fallback: {name} = {FormatValue(value)}");
             }
         }
@@ -598,15 +604,15 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             return default;
         }
 
+        // Handle JsonElement - use lazy deserialization
+        if (value is JsonElement element)
+        {
+            return JsonValueConverter.Convert<T>(element);
+        }
+
         if (value is T typed)
         {
             return typed;
-        }
-
-        // Handle JsonElement
-        if (value is JsonElement element)
-        {
-            return element.Deserialize<T>();
         }
 
         try

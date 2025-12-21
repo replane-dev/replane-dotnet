@@ -1,6 +1,29 @@
 using Replane.Testing;
+using System.Text.Json;
 
 namespace Replane.Tests;
+
+// Complex types for testing
+public record ThemeConfig
+{
+    public bool DarkMode { get; init; }
+    public string PrimaryColor { get; init; } = "";
+    public int FontSize { get; init; }
+}
+
+public record FeatureFlags
+{
+    public bool NewUI { get; init; }
+    public bool BetaFeatures { get; init; }
+    public List<string> EnabledModules { get; init; } = [];
+}
+
+public record ApiConfig
+{
+    public string Endpoint { get; init; } = "";
+    public int TimeoutMs { get; init; }
+    public Dictionary<string, string> Headers { get; init; } = [];
+}
 
 public class InMemoryClientTests
 {
@@ -245,8 +268,8 @@ public class InMemoryClientTests
         client.Set("watched", "v2");
 
         updates.Should().HaveCount(2);
-        updates[0].Value.Should().Be("v1");
-        updates[1].Value.Should().Be("v2");
+        updates[0].GetValue<string>().Should().Be("v1");
+        updates[1].GetValue<string>().Should().Be("v2");
     }
 
     [Fact]
@@ -427,5 +450,167 @@ public class InMemoryClientTests
 
         client.Get<string>("config", new ReplaneContext { ["status"] = "blocked" })
             .Should().Be("default");
+    }
+
+    // Complex type tests
+
+    [Fact]
+    public void Get_ComplexType_DeserializesCorrectly()
+    {
+        var themeConfig = new ThemeConfig
+        {
+            DarkMode = true,
+            PrimaryColor = "#3B82F6",
+            FontSize = 14
+        };
+
+        using var client = TestClient.Create(new Dictionary<string, object?>
+        {
+            ["theme"] = themeConfig
+        });
+
+        var result = client.Get<ThemeConfig>("theme");
+
+        result.Should().NotBeNull();
+        result!.DarkMode.Should().BeTrue();
+        result.PrimaryColor.Should().Be("#3B82F6");
+        result.FontSize.Should().Be(14);
+    }
+
+    [Fact]
+    public void Get_ComplexTypeWithNestedLists_DeserializesCorrectly()
+    {
+        var featureFlags = new FeatureFlags
+        {
+            NewUI = true,
+            BetaFeatures = false,
+            EnabledModules = ["dashboard", "analytics", "reports"]
+        };
+
+        using var client = TestClient.Create(new Dictionary<string, object?>
+        {
+            ["features"] = featureFlags
+        });
+
+        var result = client.Get<FeatureFlags>("features");
+
+        result.Should().NotBeNull();
+        result!.NewUI.Should().BeTrue();
+        result.BetaFeatures.Should().BeFalse();
+        result.EnabledModules.Should().BeEquivalentTo(["dashboard", "analytics", "reports"]);
+    }
+
+    [Fact]
+    public void Get_ComplexTypeWithDictionary_DeserializesCorrectly()
+    {
+        var apiConfig = new ApiConfig
+        {
+            Endpoint = "https://api.example.com",
+            TimeoutMs = 5000,
+            Headers = new Dictionary<string, string>
+            {
+                ["Authorization"] = "Bearer token",
+                ["X-Custom-Header"] = "value"
+            }
+        };
+
+        using var client = TestClient.Create(new Dictionary<string, object?>
+        {
+            ["api-config"] = apiConfig
+        });
+
+        var result = client.Get<ApiConfig>("api-config");
+
+        result.Should().NotBeNull();
+        result!.Endpoint.Should().Be("https://api.example.com");
+        result.TimeoutMs.Should().Be(5000);
+        result.Headers.Should().ContainKey("Authorization");
+        result.Headers["Authorization"].Should().Be("Bearer token");
+    }
+
+    [Fact]
+    public void Get_ComplexTypeWithOverrides_EvaluatesAndDeserializesCorrectly()
+    {
+        using var client = TestClient.Create();
+
+        var defaultTheme = new ThemeConfig { DarkMode = false, PrimaryColor = "#000000", FontSize = 12 };
+        var premiumTheme = new ThemeConfig { DarkMode = true, PrimaryColor = "#FFD700", FontSize = 16 };
+
+        client.SetConfigWithOverrides(
+            "theme",
+            value: defaultTheme,
+            overrides:
+            [
+                new OverrideData
+                {
+                    Name = "premium-theme",
+                    Conditions =
+                    [
+                        new ConditionData
+                        {
+                            Operator = "equals",
+                            Property = "plan",
+                            Expected = "premium"
+                        }
+                    ],
+                    Value = premiumTheme
+                }
+            ]);
+
+        // Free user gets default theme
+        var freeTheme = client.Get<ThemeConfig>("theme", new ReplaneContext { ["plan"] = "free" });
+        freeTheme!.DarkMode.Should().BeFalse();
+        freeTheme.PrimaryColor.Should().Be("#000000");
+
+        // Premium user gets premium theme
+        var pTheme = client.Get<ThemeConfig>("theme", new ReplaneContext { ["plan"] = "premium" });
+        pTheme!.DarkMode.Should().BeTrue();
+        pTheme.PrimaryColor.Should().Be("#FFD700");
+    }
+
+    [Fact]
+    public void ConfigChanged_GetValue_DeserializesComplexType()
+    {
+        using var client = TestClient.Create();
+
+        var receivedThemes = new List<ThemeConfig?>();
+        client.ConfigChanged += (sender, e) =>
+        {
+            if (e.ConfigName == "theme")
+            {
+                receivedThemes.Add(e.GetValue<ThemeConfig>());
+            }
+        };
+
+        client.Set("theme", new ThemeConfig { DarkMode = true, PrimaryColor = "#FF0000", FontSize = 14 });
+        client.Set("theme", new ThemeConfig { DarkMode = false, PrimaryColor = "#00FF00", FontSize = 16 });
+
+        receivedThemes.Should().HaveCount(2);
+        receivedThemes[0]!.DarkMode.Should().BeTrue();
+        receivedThemes[0]!.PrimaryColor.Should().Be("#FF0000");
+        receivedThemes[1]!.DarkMode.Should().BeFalse();
+        receivedThemes[1]!.PrimaryColor.Should().Be("#00FF00");
+    }
+
+    [Fact]
+    public void Get_AnonymousObjectAsComplexType_DeserializesCorrectly()
+    {
+        // Test that anonymous objects (like from JSON) deserialize correctly
+        using var client = TestClient.Create(new Dictionary<string, object?>
+        {
+            ["settings"] = new
+            {
+                darkMode = true,
+                primaryColor = "#123456",
+                fontSize = 18
+            }
+        });
+
+        var result = client.Get<ThemeConfig>("settings");
+
+        result.Should().NotBeNull();
+        result!.DarkMode.Should().BeTrue();
+        result.PrimaryColor.Should().Be("#123456");
+        result.FontSize.Should().Be(18);
     }
 }

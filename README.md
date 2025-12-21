@@ -56,6 +56,27 @@ var apiKey = replane.Get<string>("api-key");
 var timeout = replane.Get<int>("timeout-ms", defaultValue: 5000);
 ```
 
+### Complex Types
+
+Configs can store complex objects that are deserialized on demand:
+
+```csharp
+// Define your config type
+public record ThemeConfig
+{
+    public bool DarkMode { get; init; }
+    public string PrimaryColor { get; init; } = "";
+    public int FontSize { get; init; }
+}
+
+// Get complex config
+var theme = replane.Get<ThemeConfig>("theme");
+Console.WriteLine($"Dark mode: {theme.DarkMode}, Color: {theme.PrimaryColor}");
+
+// Works with overrides too - different themes for different users
+var userTheme = replane.Get<ThemeConfig>("theme", new ReplaneContext { ["plan"] = "premium" });
+```
+
 ### Context-Based Overrides
 
 Evaluate configs based on user context:
@@ -98,15 +119,26 @@ Subscribe to config changes using the `ConfigChanged` event:
 // Subscribe to all config changes
 replane.ConfigChanged += (sender, e) =>
 {
-    Console.WriteLine($"Config '{e.ConfigName}' updated to: {e.Config.Value}");
+    Console.WriteLine($"Config '{e.ConfigName}' updated");
 };
 
-// Filter for specific configs
+// Get typed value from the event
 replane.ConfigChanged += (sender, e) =>
 {
     if (e.ConfigName == "feature-flag")
     {
-        Console.WriteLine($"Feature flag changed: {e.Config.Value}");
+        var enabled = e.GetValue<bool>();
+        Console.WriteLine($"Feature flag changed to: {enabled}");
+    }
+};
+
+// Works with complex types too
+replane.ConfigChanged += (sender, e) =>
+{
+    if (e.ConfigName == "theme")
+    {
+        var theme = e.GetValue<ThemeConfig>();
+        Console.WriteLine($"Theme updated: dark={theme?.DarkMode}");
     }
 };
 
@@ -264,8 +296,67 @@ public void TestConfigChangeEvent()
     client.Set("feature", false);
 
     receivedEvents.Should().HaveCount(2);
-    receivedEvents[0].Config.Value.Should().Be(true);
-    receivedEvents[1].Config.Value.Should().Be(false);
+    receivedEvents[0].GetValue<bool>().Should().BeTrue();
+    receivedEvents[1].GetValue<bool>().Should().BeFalse();
+}
+```
+
+### Testing Complex Types
+
+```csharp
+public record FeatureFlags
+{
+    public bool NewUI { get; init; }
+    public List<string> EnabledModules { get; init; } = [];
+}
+
+[Fact]
+public void TestComplexType()
+{
+    var flags = new FeatureFlags
+    {
+        NewUI = true,
+        EnabledModules = ["dashboard", "analytics"]
+    };
+
+    using var client = TestClient.Create(new Dictionary<string, object?>
+    {
+        ["features"] = flags
+    });
+
+    var result = client.Get<FeatureFlags>("features");
+
+    result!.NewUI.Should().BeTrue();
+    result.EnabledModules.Should().Contain("dashboard");
+}
+
+[Fact]
+public void TestComplexTypeWithOverrides()
+{
+    using var client = TestClient.Create();
+
+    var defaultTheme = new ThemeConfig { DarkMode = false, PrimaryColor = "#000", FontSize = 12 };
+    var premiumTheme = new ThemeConfig { DarkMode = true, PrimaryColor = "#FFD700", FontSize = 16 };
+
+    client.SetConfigWithOverrides(
+        name: "theme",
+        value: defaultTheme,
+        overrides: [
+            new OverrideData
+            {
+                Name = "premium-theme",
+                Conditions = [
+                    new ConditionData { Operator = "equals", Property = "plan", Expected = "premium" }
+                ],
+                Value = premiumTheme
+            }
+        ]);
+
+    client.Get<ThemeConfig>("theme", new ReplaneContext { ["plan"] = "free" })!
+        .DarkMode.Should().BeFalse();
+
+    client.Get<ThemeConfig>("theme", new ReplaneContext { ["plan"] = "premium" })!
+        .DarkMode.Should().BeTrue();
 }
 ```
 

@@ -2,18 +2,22 @@ namespace Replane.Tests;
 
 public class EvaluationTests
 {
+    // Helper to convert object to JsonElement for tests
+    private static System.Text.Json.JsonElement ToJson(object? value) => JsonValueConverter.ToJsonElement(value);
+
     [Fact]
     public void EvaluateConfig_NoOverrides_ReturnsBaseValue()
     {
         var config = new Config
         {
             Name = "test-config",
-            Value = "base-value"
+            Value = ToJson("base-value")
         };
 
         var result = Evaluator.EvaluateConfig(config);
 
-        result.Should().Be("base-value");
+        result.Should().BeOfType<System.Text.Json.JsonElement>();
+        JsonValueConverter.Convert<string>((System.Text.Json.JsonElement)result!).Should().Be("base-value");
     }
 
     [Fact]
@@ -22,7 +26,7 @@ public class EvaluationTests
         var config = new Config
         {
             Name = "test-config",
-            Value = false,
+            Value = ToJson(false),
             Overrides =
             [
                 new Override
@@ -37,7 +41,7 @@ public class EvaluationTests
                             Expected = "beta"
                         }
                     ],
-                    Value = true
+                    Value = ToJson(true)
                 }
             ]
         };
@@ -45,7 +49,7 @@ public class EvaluationTests
         var context = new ReplaneContext { ["plan"] = "beta" };
         var result = Evaluator.EvaluateConfig(config, context);
 
-        result.Should().Be(true);
+        JsonValueConverter.Convert<bool>((System.Text.Json.JsonElement)result!).Should().BeTrue();
     }
 
     [Fact]
@@ -54,7 +58,7 @@ public class EvaluationTests
         var config = new Config
         {
             Name = "test-config",
-            Value = false,
+            Value = ToJson(false),
             Overrides =
             [
                 new Override
@@ -69,7 +73,7 @@ public class EvaluationTests
                             Expected = "beta"
                         }
                     ],
-                    Value = true
+                    Value = ToJson(true)
                 }
             ]
         };
@@ -77,7 +81,7 @@ public class EvaluationTests
         var context = new ReplaneContext { ["plan"] = "free" };
         var result = Evaluator.EvaluateConfig(config, context);
 
-        result.Should().Be(false);
+        JsonValueConverter.Convert<bool>((System.Text.Json.JsonElement)result!).Should().BeFalse();
     }
 
     [Fact]
@@ -86,7 +90,7 @@ public class EvaluationTests
         var config = new Config
         {
             Name = "test-config",
-            Value = "default",
+            Value = ToJson("default"),
             Overrides =
             [
                 new Override
@@ -96,7 +100,7 @@ public class EvaluationTests
                     [
                         new PropertyCondition { Op = "equals", Property = "x", Expected = 1 }
                     ],
-                    Value = "first-value"
+                    Value = ToJson("first-value")
                 },
                 new Override
                 {
@@ -105,7 +109,7 @@ public class EvaluationTests
                     [
                         new PropertyCondition { Op = "equals", Property = "x", Expected = 1 }
                     ],
-                    Value = "second-value"
+                    Value = ToJson("second-value")
                 }
             ]
         };
@@ -113,7 +117,7 @@ public class EvaluationTests
         var context = new ReplaneContext { ["x"] = 1 };
         var result = Evaluator.EvaluateConfig(config, context);
 
-        result.Should().Be("first-value");
+        JsonValueConverter.Convert<string>((System.Text.Json.JsonElement)result!).Should().Be("first-value");
     }
 
     // Property condition tests

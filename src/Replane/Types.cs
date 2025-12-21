@@ -38,11 +38,16 @@ public sealed record Config
     /// <summary>Unique identifier for this config.</summary>
     public required string Name { get; init; }
 
-    /// <summary>The base/default value returned when no overrides match.</summary>
-    public required object? Value { get; init; }
+    /// <summary>The base/default value stored as a raw JsonElement for lazy deserialization.</summary>
+    public required JsonElement Value { get; init; }
 
     /// <summary>List of override rules evaluated in order.</summary>
     public IReadOnlyList<Override> Overrides { get; init; } = [];
+
+    /// <summary>
+    /// Gets the value deserialized to the specified type.
+    /// </summary>
+    public T? GetValue<T>() => JsonValueConverter.Convert<T>(Value);
 }
 
 /// <summary>
@@ -56,8 +61,13 @@ public sealed record Override
     /// <summary>Conditions that must all match for this override to apply.</summary>
     public required IReadOnlyList<Condition> Conditions { get; init; }
 
-    /// <summary>Value to return when this override matches.</summary>
-    public required object? Value { get; init; }
+    /// <summary>Value to return when this override matches stored as a raw JsonElement.</summary>
+    public required JsonElement Value { get; init; }
+
+    /// <summary>
+    /// Gets the value deserialized to the specified type.
+    /// </summary>
+    public T? GetValue<T>() => JsonValueConverter.Convert<T>(Value);
 }
 
 /// <summary>
@@ -153,9 +163,9 @@ public sealed record NotCondition : Condition
 }
 
 /// <summary>
-/// Parser for config data from API responses.
+/// Utility class for converting JsonElement to typed values.
 /// </summary>
-public static class ConfigParser
+public static class JsonValueConverter
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -163,6 +173,67 @@ public static class ConfigParser
         PropertyNameCaseInsensitive = true,
     };
 
+    /// <summary>
+    /// Converts a JsonElement to the specified type.
+    /// </summary>
+    public static T? Convert<T>(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined)
+        {
+            return default;
+        }
+
+        // If T is JsonElement, return as-is
+        if (typeof(T) == typeof(JsonElement))
+        {
+            return (T)(object)element;
+        }
+
+        // If T is object, return the parsed primitive value for simple types
+        if (typeof(T) == typeof(object))
+        {
+            return (T?)ParseJsonValueAsObject(element);
+        }
+
+        // For all other types, deserialize using System.Text.Json
+        return element.Deserialize<T>(JsonOptions);
+    }
+
+    /// <summary>
+    /// Parses a JsonElement to a primitive .NET object (for condition evaluation).
+    /// </summary>
+    public static object? ParseJsonValueAsObject(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt64(out var l) => l,
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => null,
+            JsonValueKind.Array => element.EnumerateArray().Select(ParseJsonValueAsObject).ToList(),
+            JsonValueKind.Object => element.EnumerateObject().ToDictionary(p => p.Name, p => ParseJsonValueAsObject(p.Value)),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Creates a JsonElement from a .NET object (for testing/fallbacks).
+    /// </summary>
+    public static JsonElement ToJsonElement(object? value)
+    {
+        var json = JsonSerializer.Serialize(value, JsonOptions);
+        return JsonDocument.Parse(json).RootElement.Clone();
+    }
+}
+
+/// <summary>
+/// Parser for config data from API responses.
+/// </summary>
+public static class ConfigParser
+{
     public static Condition ParseCondition(JsonElement element)
     {
         var op = element.GetProperty("operator").GetString() ?? throw new JsonException("Missing operator");
@@ -204,27 +275,12 @@ public static class ConfigParser
     private static object? GetExpectedValue(JsonElement element)
     {
         // Try 'expected' first (Python SDK style), then 'value' (JS SDK style)
+        // For condition evaluation, we need the actual parsed value
         if (element.TryGetProperty("expected", out var expected))
-            return ParseJsonValue(expected);
+            return JsonValueConverter.ParseJsonValueAsObject(expected);
         if (element.TryGetProperty("value", out var value))
-            return ParseJsonValue(value);
+            return JsonValueConverter.ParseJsonValueAsObject(value);
         return null;
-    }
-
-    public static object? ParseJsonValue(JsonElement element)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number when element.TryGetInt64(out var l) => l,
-            JsonValueKind.Number => element.GetDouble(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Array => element.EnumerateArray().Select(ParseJsonValue).ToList(),
-            JsonValueKind.Object => element.Deserialize<Dictionary<string, object?>>(JsonOptions),
-            _ => null
-        };
     }
 
     public static Override ParseOverride(JsonElement element)
@@ -234,7 +290,7 @@ public static class ConfigParser
             Name = element.GetProperty("name").GetString()!,
             Conditions = element.GetProperty("conditions").EnumerateArray()
                 .Select(ParseCondition).ToList(),
-            Value = ParseJsonValue(element.GetProperty("value"))
+            Value = element.GetProperty("value").Clone()
         };
     }
 
@@ -250,7 +306,7 @@ public static class ConfigParser
         return new Config
         {
             Name = element.GetProperty("name").GetString()!,
-            Value = ParseJsonValue(element.GetProperty("value")),
+            Value = element.GetProperty("value").Clone(),
             Overrides = overrides
         };
     }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Replane.Testing;
 
 /// <summary>
@@ -31,7 +33,8 @@ public sealed class InMemoryReplaneClient : IDisposable
         {
             foreach (var (name, value) in initialConfigs)
             {
-                _configs[name] = new Config { Name = name, Value = value };
+                var jsonValue = JsonValueConverter.ToJsonElement(value);
+                _configs[name] = new Config { Name = name, Value = jsonValue };
             }
         }
     }
@@ -58,6 +61,13 @@ public sealed class InMemoryReplaneClient : IDisposable
         }
 
         var result = Evaluator.EvaluateConfig(config, mergedContext);
+
+        // Result is a JsonElement, deserialize to requested type
+        if (result is JsonElement element)
+        {
+            return JsonValueConverter.Convert<T>(element);
+        }
+
         return ConvertValue<T>(result);
     }
 
@@ -82,10 +92,11 @@ public sealed class InMemoryReplaneClient : IDisposable
     /// </summary>
     public void SetConfig(string name, object? value, IReadOnlyList<Override>? overrides = null)
     {
+        var jsonValue = JsonValueConverter.ToJsonElement(value);
         var config = new Config
         {
             Name = name,
-            Value = value,
+            Value = jsonValue,
             Overrides = overrides ?? []
         };
 
@@ -115,7 +126,7 @@ public sealed class InMemoryReplaneClient : IDisposable
                 {
                     Name = overrideData.Name,
                     Conditions = conditions,
-                    Value = overrideData.Value
+                    Value = JsonValueConverter.ToJsonElement(overrideData.Value)
                 });
             }
         }

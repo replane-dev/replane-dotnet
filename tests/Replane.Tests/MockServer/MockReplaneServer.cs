@@ -88,7 +88,7 @@ public sealed class MockReplaneServer : IAsyncDisposable
     /// </summary>
     public void AddConfig(string name, object? value)
     {
-        AddConfig(new Config { Name = name, Value = value });
+        AddConfig(new Config { Name = name, Value = JsonValueConverter.ToJsonElement(value) });
     }
 
     /// <summary>
@@ -102,11 +102,11 @@ public sealed class MockReplaneServer : IAsyncDisposable
             config = new
             {
                 name = config.Name,
-                value = config.Value,
+                value = JsonValueConverter.ParseJsonValueAsObject(config.Value),
                 overrides = config.Overrides.Select(o => new
                 {
                     name = o.Name,
-                    value = o.Value,
+                    value = JsonValueConverter.ParseJsonValueAsObject(o.Value),
                     conditions = SerializeConditions(o.Conditions)
                 }).ToList()
             }
@@ -241,11 +241,11 @@ public sealed class MockReplaneServer : IAsyncDisposable
                 configs = configsCopy.Select(c => new
                 {
                     name = c.Name,
-                    value = c.Value,
+                    value = JsonValueConverter.ParseJsonValueAsObject(c.Value),
                     overrides = c.Overrides.Select(o => new
                     {
                         name = o.Name,
-                        value = o.Value,
+                        value = JsonValueConverter.ParseJsonValueAsObject(o.Value),
                         conditions = SerializeConditions(o.Conditions)
                     }).ToList()
                 }).ToList()
