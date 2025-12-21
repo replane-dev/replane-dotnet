@@ -85,26 +85,35 @@ var client = new ReplaneClient(new ReplaneClientOptions
 });
 ```
 
-### Subscriptions
+### Real-time Updates
 
-Subscribe to config changes:
+Subscribe to config changes using the `ConfigChanged` event:
 
 ```csharp
-// Subscribe to all changes
-var unsubscribe = client.Subscribe((name, config) =>
+// Subscribe to all config changes
+client.ConfigChanged += (sender, e) =>
 {
-    Console.WriteLine($"Config '{name}' updated");
-});
+    Console.WriteLine($"Config '{e.ConfigName}' updated to: {e.Config.Value}");
+};
 
-// Subscribe to specific config
-var unsubscribeSpecific = client.SubscribeConfig("feature-flag", config =>
+// Filter for specific configs
+client.ConfigChanged += (sender, e) =>
 {
-    Console.WriteLine($"Feature flag updated: {config.Value}");
-});
+    if (e.ConfigName == "feature-flag")
+    {
+        Console.WriteLine($"Feature flag changed: {e.Config.Value}");
+    }
+};
 
-// Unsubscribe when done
-unsubscribe();
-unsubscribeSpecific();
+// Unsubscribe when needed
+void OnConfigChanged(object? sender, ConfigChangedEventArgs e)
+{
+    Console.WriteLine($"Config changed: {e.ConfigName}");
+}
+
+client.ConfigChanged += OnConfigChanged;
+// Later...
+client.ConfigChanged -= OnConfigChanged;
 ```
 
 ### Fallback Values
@@ -235,6 +244,26 @@ public void TestABTest()
 }
 ```
 
+### Testing Config Changes
+
+```csharp
+[Fact]
+public void TestConfigChangeEvent()
+{
+    using var client = TestClient.Create();
+
+    var receivedEvents = new List<ConfigChangedEventArgs>();
+    client.ConfigChanged += (sender, e) => receivedEvents.Add(e);
+
+    client.Set("feature", true);
+    client.Set("feature", false);
+
+    receivedEvents.Should().HaveCount(2);
+    receivedEvents[0].Config.Value.Should().Be(true);
+    receivedEvents[1].Config.Value.Should().Be(false);
+}
+```
+
 ## Configuration Options
 
 | Option                    | Type                          | Default  | Description                     |
@@ -250,6 +279,60 @@ public void TestABTest()
 | `InactivityTimeoutMs`     | `int`                         | `30000`  | SSE inactivity timeout          |
 | `HttpClient`              | `HttpClient`                  | `null`   | Custom HttpClient               |
 | `Debug`                   | `bool`                        | `false`  | Enable debug logging            |
+
+## Debug Logging
+
+Enable debug logging to troubleshoot issues:
+
+```csharp
+var client = new ReplaneClient(new ReplaneClientOptions
+{
+    BaseUrl = "https://your-server.com",
+    SdkKey = "your-key",
+    Debug = true
+});
+```
+
+This outputs detailed logs including:
+
+- Client initialization with all options
+- SSE connection lifecycle (connect, reconnect, disconnect)
+- Every `Get()` call with config name, context, and result
+- Override evaluation details (which conditions matched/failed)
+- Raw SSE event data
+
+Example output:
+
+```
+[DEBUG] Replane: Initializing ReplaneClient with options:
+[DEBUG] Replane:   BaseUrl: https://your-server.com
+[DEBUG] Replane:   SdkKey: your...key
+[DEBUG] Replane: Connecting to SSE: https://your-server.com/api/sdk/v1/replication/stream
+[DEBUG] Replane: SSE event received: type=init
+[DEBUG] Replane: Initialization complete: 5 configs loaded
+[DEBUG] Replane: Get<Boolean>("feature-flag") called
+[DEBUG] Replane:   Config "feature-flag" found, base value: false, overrides: 1
+[DEBUG] Replane:     Evaluating override #0 (conditions: property(plan equals "premium"))
+[DEBUG] Replane:       Condition: property "plan" ("premium") equals "premium" => Matched
+[DEBUG] Replane:   Override #0 matched, returning: true
+```
+
+### Custom Logger
+
+Provide your own logger implementation:
+
+```csharp
+public class MyLogger : IReplaneLogger
+{
+    public void Log(LogLevel level, string message, Exception? exception = null)
+    {
+        // Forward to your logging framework
+        _logger.Log(MapLevel(level), exception, message);
+    }
+}
+
+var client = new ReplaneClient(options, new MyLogger());
+```
 
 ## Condition Operators
 
