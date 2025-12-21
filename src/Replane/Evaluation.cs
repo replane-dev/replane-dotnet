@@ -30,17 +30,126 @@ public static class Evaluator
     /// </summary>
     public static object? EvaluateConfig(Config config, ReplaneContext? context = null)
     {
+        var (result, _) = EvaluateConfigWithDetails(config, context, null);
+        return result;
+    }
+
+    /// <summary>
+    /// Evaluate a config with detailed logging. Returns the value and the index of the matched override (-1 if none).
+    /// </summary>
+    public static (object? Value, int MatchedOverrideIndex) EvaluateConfigWithDetails(
+        Config config,
+        ReplaneContext? context,
+        IReplaneLogger? logger)
+    {
         context ??= [];
 
-        foreach (var @override in config.Overrides)
+        for (var i = 0; i < config.Overrides.Count; i++)
         {
-            if (EvaluateOverride(@override, context))
+            var @override = config.Overrides[i];
+            logger?.LogDebug($"    Evaluating override #{i} (conditions: {string.Join(", ", @override.Conditions.Select(FormatCondition))})");
+
+            var matched = EvaluateOverrideWithLogging(@override, context, logger, i);
+            if (matched)
             {
-                return @override.Value;
+                logger?.LogDebug($"    Override #{i} MATCHED");
+                return (@override.Value, i);
+            }
+            else
+            {
+                logger?.LogDebug($"    Override #{i} did not match");
             }
         }
 
-        return config.Value;
+        return (config.Value, -1);
+    }
+
+    private static string FormatCondition(Condition condition)
+    {
+        return condition switch
+        {
+            PropertyCondition prop => $"property({prop.Property} {prop.Operator} {prop.Expected})",
+            SegmentationCondition seg => $"segment({seg.Property} in {seg.FromPercentage}-{seg.ToPercentage}%)",
+            AndCondition and => $"AND({and.Conditions.Count})",
+            OrCondition or => $"OR({or.Conditions.Count})",
+            NotCondition => "NOT(...)",
+            _ => condition.GetType().Name
+        };
+    }
+
+    private static bool EvaluateOverrideWithLogging(Override @override, ReplaneContext context, IReplaneLogger? logger, int overrideIndex)
+    {
+        foreach (var condition in @override.Conditions)
+        {
+            var result = EvaluateConditionWithLogging(condition, context, logger);
+            if (result != ConditionResult.Matched)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static ConditionResult EvaluateConditionWithLogging(Condition condition, ReplaneContext context, IReplaneLogger? logger)
+    {
+        var result = EvaluateCondition(condition, context);
+
+        if (logger != null)
+        {
+            var conditionDesc = FormatConditionForLogging(condition, context);
+            logger.LogDebug($"      Condition: {conditionDesc} => {result}");
+        }
+
+        return result;
+    }
+
+    private static string FormatConditionForLogging(Condition condition, ReplaneContext context)
+    {
+        switch (condition)
+        {
+            case PropertyCondition prop:
+                context.TryGetValue(prop.Property, out var propCtxValue);
+                return $"property \"{prop.Property}\" ({FormatContextValue(propCtxValue)}) {prop.Operator} {FormatExpectedValue(prop.Expected)}";
+
+            case SegmentationCondition seg:
+                context.TryGetValue(seg.Property, out var segCtxValue);
+                var strValue = segCtxValue != null ? Convert.ToString(segCtxValue, CultureInfo.InvariantCulture) ?? "" : "";
+                var percentage = segCtxValue != null ? Fnv1a.HashToPercentage(strValue, seg.Seed) : -1;
+                return $"segment \"{seg.Property}\" ({FormatContextValue(segCtxValue)}) hash={percentage:F2}% in [{seg.FromPercentage}-{seg.ToPercentage}%)";
+
+            case AndCondition and:
+                return $"AND condition with {and.Conditions.Count} sub-conditions";
+
+            case OrCondition or:
+                return $"OR condition with {or.Conditions.Count} sub-conditions";
+
+            case NotCondition:
+                return "NOT condition";
+
+            default:
+                return condition.GetType().Name;
+        }
+    }
+
+    private static string FormatContextValue(object? value)
+    {
+        return value switch
+        {
+            null => "<missing>",
+            string s => $"\"{s}\"",
+            _ => value.ToString() ?? "null"
+        };
+    }
+
+    private static string FormatExpectedValue(object? value)
+    {
+        return value switch
+        {
+            null => "null",
+            string s => $"\"{s}\"",
+            IEnumerable<object?> list => $"[{string.Join(", ", list.Select(FormatExpectedValue))}]",
+            _ => value.ToString() ?? "null"
+        };
     }
 
     /// <summary>

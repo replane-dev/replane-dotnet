@@ -11,8 +11,10 @@ public sealed class InMemoryReplaneClient : IDisposable
     private readonly ReplaneContext _context;
     private bool _closed;
 
-    private readonly List<ConfigChangeCallback> _allSubscribers = [];
-    private readonly Dictionary<string, List<SingleConfigChangeCallback>> _configSubscribers = new(StringComparer.Ordinal);
+    /// <summary>
+    /// Event raised when any config is changed.
+    /// </summary>
+    public event EventHandler<ConfigChangedEventArgs>? ConfigChanged;
 
     /// <summary>
     /// Creates a new in-memory client.
@@ -88,7 +90,7 @@ public sealed class InMemoryReplaneClient : IDisposable
         };
 
         _configs[name] = config;
-        NotifySubscribers(name, config);
+        OnConfigChanged(config);
     }
 
     /// <summary>
@@ -130,36 +132,6 @@ public sealed class InMemoryReplaneClient : IDisposable
     }
 
     /// <summary>
-    /// Subscribe to all config changes.
-    /// </summary>
-    public Action Subscribe(ConfigChangeCallback callback)
-    {
-        _allSubscribers.Add(callback);
-        return () => _allSubscribers.Remove(callback);
-    }
-
-    /// <summary>
-    /// Subscribe to changes for a specific config.
-    /// </summary>
-    public Action SubscribeConfig(string name, SingleConfigChangeCallback callback)
-    {
-        if (!_configSubscribers.TryGetValue(name, out var list))
-        {
-            list = [];
-            _configSubscribers[name] = list;
-        }
-        list.Add(callback);
-
-        return () =>
-        {
-            if (_configSubscribers.TryGetValue(name, out var l))
-            {
-                l.Remove(callback);
-            }
-        };
-    }
-
-    /// <summary>
     /// Check if the client has finished initialization.
     /// For in-memory client, always returns true.
     /// </summary>
@@ -185,33 +157,27 @@ public sealed class InMemoryReplaneClient : IDisposable
     public IReadOnlyDictionary<string, Config> Configs =>
         new Dictionary<string, Config>(_configs);
 
-    private void NotifySubscribers(string name, Config config)
+    /// <summary>
+    /// Raises the ConfigChanged event.
+    /// </summary>
+    private void OnConfigChanged(Config config)
     {
-        foreach (var callback in _allSubscribers.ToList())
-        {
-            try
-            {
-                callback(name, config);
-            }
-            catch
-            {
-                // Ignore errors in callbacks during tests
-            }
-        }
+        var handler = ConfigChanged;
+        if (handler == null) return;
 
-        if (_configSubscribers.TryGetValue(name, out var configCallbacks))
+        var args = new ConfigChangedEventArgs
         {
-            foreach (var callback in configCallbacks.ToList())
-            {
-                try
-                {
-                    callback(config);
-                }
-                catch
-                {
-                    // Ignore errors in callbacks during tests
-                }
-            }
+            ConfigName = config.Name,
+            Config = config
+        };
+
+        try
+        {
+            handler(this, args);
+        }
+        catch
+        {
+            // Ignore errors in callbacks during tests
         }
     }
 

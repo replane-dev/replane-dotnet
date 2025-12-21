@@ -192,12 +192,12 @@ public class InMemoryClientTests
     }
 
     [Fact]
-    public void Subscribe_ReceivesAllUpdates()
+    public void ConfigChanged_ReceivesAllUpdates()
     {
         using var client = TestClient.Create();
 
         var updates = new List<(string Name, Config Config)>();
-        var unsubscribe = client.Subscribe((name, config) => updates.Add((name, config)));
+        client.ConfigChanged += (sender, e) => updates.Add((e.ConfigName, e.Config));
 
         client.Set("config-1", "value-1");
         client.Set("config-2", "value-2");
@@ -205,20 +205,40 @@ public class InMemoryClientTests
         updates.Should().HaveCount(2);
         updates[0].Name.Should().Be("config-1");
         updates[1].Name.Should().Be("config-2");
-
-        unsubscribe();
-
-        client.Set("config-3", "value-3");
-        updates.Should().HaveCount(2); // No more updates after unsubscribe
     }
 
     [Fact]
-    public void SubscribeConfig_ReceivesOnlyTargetUpdates()
+    public void ConfigChanged_CanUnsubscribe()
+    {
+        using var client = TestClient.Create();
+
+        var updates = new List<(string Name, Config Config)>();
+        void Handler(object? sender, ConfigChangedEventArgs e) => updates.Add((e.ConfigName, e.Config));
+
+        client.ConfigChanged += Handler;
+
+        client.Set("config-1", "value-1");
+        updates.Should().HaveCount(1);
+
+        client.ConfigChanged -= Handler;
+
+        client.Set("config-2", "value-2");
+        updates.Should().HaveCount(1); // No more updates after unsubscribe
+    }
+
+    [Fact]
+    public void ConfigChanged_CanFilterByConfigName()
     {
         using var client = TestClient.Create();
 
         var updates = new List<Config>();
-        var unsubscribe = client.SubscribeConfig("watched", config => updates.Add(config));
+        client.ConfigChanged += (sender, e) =>
+        {
+            if (e.ConfigName == "watched")
+            {
+                updates.Add(e.Config);
+            }
+        };
 
         client.Set("watched", "v1");
         client.Set("other", "other-value");
@@ -227,8 +247,6 @@ public class InMemoryClientTests
         updates.Should().HaveCount(2);
         updates[0].Value.Should().Be("v1");
         updates[1].Value.Should().Be("v2");
-
-        unsubscribe();
     }
 
     [Fact]

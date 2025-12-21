@@ -216,10 +216,10 @@ public class ClientIntegrationTests : IAsyncLifetime
         await client.ConnectAsync();
 
         var receivedUpdates = new List<(string Name, Config Config)>();
-        var unsubscribe = client.Subscribe((name, config) =>
+        client.ConfigChanged += (sender, e) =>
         {
-            receivedUpdates.Add((name, config));
-        });
+            receivedUpdates.Add((e.ConfigName, e.Config));
+        };
 
         // Initial value
         client.Get<string>("test-config").Should().Be("initial");
@@ -227,12 +227,10 @@ public class ClientIntegrationTests : IAsyncLifetime
         // Note: For a complete test, we'd need to implement broadcasting
         // config changes from the server. The current mock server doesn't
         // fully support this, but the subscription mechanism is in place.
-
-        unsubscribe();
     }
 
     [Fact]
-    public async Task SubscribeConfig_ReceivesSpecificUpdates()
+    public async Task ConfigChanged_ReceivesUpdates()
     {
         _server.AddConfig("watched-config", "initial");
         _server.AddConfig("other-config", "other");
@@ -245,16 +243,14 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await client.ConnectAsync();
 
-        var receivedUpdates = new List<Config>();
-        var unsubscribe = client.SubscribeConfig("watched-config", config =>
+        var receivedUpdates = new List<ConfigChangedEventArgs>();
+        client.ConfigChanged += (sender, e) =>
         {
-            receivedUpdates.Add(config);
-        });
+            receivedUpdates.Add(e);
+        };
 
-        // Verify subscription is set up
+        // Verify event handler is set up
         client.Get<string>("watched-config").Should().Be("initial");
-
-        unsubscribe();
     }
 
     [Fact]

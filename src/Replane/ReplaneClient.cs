@@ -5,14 +5,20 @@ using System.Text.Json;
 namespace Replane;
 
 /// <summary>
-/// Delegate for config change callbacks.
+/// Event arguments for config change events.
 /// </summary>
-public delegate void ConfigChangeCallback(string configName, Config config);
+public sealed class ConfigChangedEventArgs : EventArgs
+{
+    /// <summary>
+    /// The name of the config that changed.
+    /// </summary>
+    public required string ConfigName { get; init; }
 
-/// <summary>
-/// Delegate for specific config change callbacks.
-/// </summary>
-public delegate void SingleConfigChangeCallback(Config config);
+    /// <summary>
+    /// The updated config with its new value and overrides.
+    /// </summary>
+    public required Config Config { get; init; }
+}
 
 /// <summary>
 /// Replane client for fetching and subscribing to configuration changes.
@@ -29,15 +35,17 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     private readonly Dictionary<string, Config> _configs = new(StringComparer.Ordinal);
     private readonly object _lock = new();
 
-    private readonly List<ConfigChangeCallback> _allSubscribers = [];
-    private readonly Dictionary<string, List<SingleConfigChangeCallback>> _configSubscribers = new(StringComparer.Ordinal);
-
     private bool _closed;
     private bool _initialized;
     private ReplaneException? _initError;
     private readonly TaskCompletionSource<bool> _initTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenSource? _streamCts;
     private Task? _streamTask;
+
+    /// <summary>
+    /// Event raised when any config is changed.
+    /// </summary>
+    public event EventHandler<ConfigChangedEventArgs>? ConfigChanged;
 
     /// <summary>
     /// Creates a new Replane client.
@@ -47,10 +55,32 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
         _options = options;
         _logger = logger ?? (options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
 
+        _logger.LogDebug($"Initializing ReplaneClient with options:");
+        _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");
+        _logger.LogDebug($"  SdkKey: {MaskSdkKey(options.SdkKey)}");
+        _logger.LogDebug($"  RequestTimeoutMs: {options.RequestTimeoutMs}");
+        _logger.LogDebug($"  InitializationTimeoutMs: {options.InitializationTimeoutMs}");
+        _logger.LogDebug($"  RetryDelayMs: {options.RetryDelayMs}");
+        _logger.LogDebug($"  InactivityTimeoutMs: {options.InactivityTimeoutMs}");
+        _logger.LogDebug($"  Debug: {options.Debug}");
+        if (options.Context != null && options.Context.Count > 0)
+        {
+            _logger.LogDebug($"  Default context: {FormatContext(options.Context)}");
+        }
+        if (options.Fallbacks != null && options.Fallbacks.Count > 0)
+        {
+            _logger.LogDebug($"  Fallbacks: [{string.Join(", ", options.Fallbacks.Keys)}]");
+        }
+        if (options.Required != null && options.Required.Count > 0)
+        {
+            _logger.LogDebug($"  Required configs: [{string.Join(", ", options.Required)}]");
+        }
+
         if (options.HttpClient != null)
         {
             _httpClient = options.HttpClient;
             _ownsHttpClient = false;
+            _logger.LogDebug("  Using provided HttpClient");
         }
         else
         {
@@ -59,6 +89,7 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
                 Timeout = Timeout.InfiniteTimeSpan // We handle timeouts ourselves
             };
             _ownsHttpClient = true;
+            _logger.LogDebug("  Created new HttpClient");
         }
 
         // Initialize fallbacks
@@ -67,8 +98,11 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             foreach (var (name, value) in options.Fallbacks)
             {
                 _configs[name] = new Config { Name = name, Value = value };
+                _logger.LogDebug($"  Registered fallback: {name} = {FormatValue(value)}");
             }
         }
+
+        _logger.LogDebug("ReplaneClient initialized");
     }
 
     /// <summary>
@@ -123,12 +157,19 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     /// <returns>The config value with overrides applied.</returns>
     public T? Get<T>(string name, ReplaneContext? context = null, T? defaultValue = default)
     {
+        _logger.LogDebug($"Get<{typeof(T).Name}>(\"{name}\") called");
+
         if (_closed)
         {
+            _logger.LogDebug($"  Client is closed, throwing ClientClosedException");
             throw new ClientClosedException();
         }
 
         var mergedContext = (_options.Context ?? []).Merge(context);
+        if (mergedContext.Count > 0)
+        {
+            _logger.LogDebug($"  Merged context: {FormatContext(mergedContext)}");
+        }
 
         lock (_lock)
         {
@@ -136,13 +177,29 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             {
                 if (defaultValue is not null || typeof(T).IsValueType)
                 {
+                    _logger.LogDebug($"  Config \"{name}\" not found, returning default: {FormatValue(defaultValue)}");
                     return defaultValue;
                 }
+                _logger.LogDebug($"  Config \"{name}\" not found, throwing ConfigNotFoundException");
                 throw new ConfigNotFoundException(name);
             }
 
-            var result = Evaluator.EvaluateConfig(config, mergedContext);
-            return ConvertValue<T>(result);
+            _logger.LogDebug($"  Config \"{name}\" found, base value: {FormatValue(config.Value)}, overrides: {config.Overrides.Count}");
+
+            var (result, matchedOverrideIndex) = Evaluator.EvaluateConfigWithDetails(config, mergedContext, _logger);
+
+            if (matchedOverrideIndex >= 0)
+            {
+                _logger.LogDebug($"  Override #{matchedOverrideIndex} matched, returning: {FormatValue(result)}");
+            }
+            else
+            {
+                _logger.LogDebug($"  No override matched, returning base value: {FormatValue(result)}");
+            }
+
+            var converted = ConvertValue<T>(result);
+            _logger.LogDebug($"  Final value (converted to {typeof(T).Name}): {FormatValue(converted)}");
+            return converted;
         }
     }
 
@@ -155,72 +212,29 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Subscribe to all config changes.
-    /// </summary>
-    /// <param name="callback">Function called with (configName, config) on changes.</param>
-    /// <returns>Unsubscribe action.</returns>
-    public Action Subscribe(ConfigChangeCallback callback)
-    {
-        lock (_lock)
-        {
-            _allSubscribers.Add(callback);
-        }
-
-        return () =>
-        {
-            lock (_lock)
-            {
-                _allSubscribers.Remove(callback);
-            }
-        };
-    }
-
-    /// <summary>
-    /// Subscribe to changes for a specific config.
-    /// </summary>
-    /// <param name="name">Config name to watch.</param>
-    /// <param name="callback">Function called with the new config on changes.</param>
-    /// <returns>Unsubscribe action.</returns>
-    public Action SubscribeConfig(string name, SingleConfigChangeCallback callback)
-    {
-        lock (_lock)
-        {
-            if (!_configSubscribers.TryGetValue(name, out var list))
-            {
-                list = [];
-                _configSubscribers[name] = list;
-            }
-            list.Add(callback);
-        }
-
-        return () =>
-        {
-            lock (_lock)
-            {
-                if (_configSubscribers.TryGetValue(name, out var list))
-                {
-                    list.Remove(callback);
-                }
-            }
-        };
-    }
-
-    /// <summary>
     /// Close the client and stop the SSE connection.
     /// </summary>
     public void Close()
     {
-        if (_closed) return;
+        _logger.LogDebug("Close() called");
+        if (_closed)
+        {
+            _logger.LogDebug("  Client already closed, skipping");
+            return;
+        }
         _closed = true;
 
+        _logger.LogDebug("  Cancelling SSE stream...");
         _streamCts?.Cancel();
         _streamCts?.Dispose();
         _streamCts = null;
 
         if (_ownsHttpClient)
         {
+            _logger.LogDebug("  Disposing HttpClient...");
             _httpClient.Dispose();
         }
+        _logger.LogDebug("  Client closed");
     }
 
     /// <inheritdoc />
@@ -412,6 +426,24 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
 
         _logger.LogDebug($"SSE event received: type={eventType}");
 
+        // Log raw data for debugging
+        if (evt.Data.HasValue)
+        {
+            var rawJson = evt.Data.Value.ToString();
+            if (rawJson.Length > 500)
+            {
+                _logger.LogDebug($"  Raw data (truncated): {rawJson[..500]}...");
+            }
+            else
+            {
+                _logger.LogDebug($"  Raw data: {rawJson}");
+            }
+        }
+        else if (evt.RawData != null)
+        {
+            _logger.LogDebug($"  Raw data (unparsed): {evt.RawData}");
+        }
+
         switch (eventType)
         {
             case "init":
@@ -428,8 +460,11 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
 
     private void HandleInit(JsonElement data)
     {
+        _logger.LogDebug("Processing init event...");
+
         if (!data.TryGetProperty("configs", out var configsElement))
         {
+            _logger.LogDebug("  No 'configs' property found in init event data");
             return;
         }
 
@@ -442,7 +477,14 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
                 var config = ConfigParser.ParseConfig(configElement);
                 _configs[config.Name] = config;
                 configsCount++;
-                _logger.LogDebug($"Loaded config: {config.Name} (overrides={config.Overrides.Count})");
+                _logger.LogDebug($"  Loaded config: {config.Name}");
+                _logger.LogDebug($"    Base value: {FormatValue(config.Value)}");
+                _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
+                for (var i = 0; i < config.Overrides.Count; i++)
+                {
+                    var ov = config.Overrides[i];
+                    _logger.LogDebug($"      Override #{i}: value={FormatValue(ov.Value)}, conditions={ov.Conditions.Count}");
+                }
             }
 
             // Check required configs
@@ -451,9 +493,12 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
                 var missing = _options.Required.Where(r => !_configs.ContainsKey(r)).ToList();
                 if (missing.Count > 0)
                 {
+                    _logger.LogDebug($"  Missing required configs: [{string.Join(", ", missing)}]");
                     _initError = new ConfigNotFoundException($"Missing required configs: {string.Join(", ", missing)}");
                 }
             }
+
+            _logger.LogDebug($"  Current configs in cache: [{string.Join(", ", _configs.Keys)}]");
         }
 
         _initialized = true;
@@ -463,6 +508,8 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
 
     private void HandleConfigChange(JsonElement data)
     {
+        _logger.LogDebug("Processing config_change event...");
+
         JsonElement configElement;
         if (data.TryGetProperty("config", out var ce))
         {
@@ -477,38 +524,52 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
 
         lock (_lock)
         {
+            var hadPrevious = _configs.TryGetValue(config.Name, out var previousConfig);
             _configs[config.Name] = config;
 
-            // Notify subscribers
-            foreach (var callback in _allSubscribers.ToList())
+            _logger.LogDebug($"  Config \"{config.Name}\" updated:");
+            if (hadPrevious)
             {
-                try
-                {
-                    callback(config.Name, config);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"Subscriber callback error: {ex.Message}", ex);
-                }
+                _logger.LogDebug($"    Previous base value: {FormatValue(previousConfig!.Value)}");
             }
-
-            if (_configSubscribers.TryGetValue(config.Name, out var configCallbacks))
-            {
-                foreach (var callback in configCallbacks.ToList())
-                {
-                    try
-                    {
-                        callback(config);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Subscriber callback error: {ex.Message}", ex);
-                    }
-                }
-            }
+            _logger.LogDebug($"    New base value: {FormatValue(config.Value)}");
+            _logger.LogDebug($"    Overrides: {config.Overrides.Count}");
         }
 
-        _logger.LogDebug($"Config updated: {config.Name}");
+        // Raise event outside the lock to avoid deadlocks
+        OnConfigChanged(config);
+
+        _logger.LogDebug($"Config change processed: {config.Name}");
+    }
+
+    /// <summary>
+    /// Raises the ConfigChanged event.
+    /// </summary>
+    private void OnConfigChanged(Config config)
+    {
+        var handler = ConfigChanged;
+        if (handler == null)
+        {
+            _logger.LogDebug("  No ConfigChanged event handlers registered");
+            return;
+        }
+
+        _logger.LogDebug($"  Raising ConfigChanged event for \"{config.Name}\"");
+
+        var args = new ConfigChangedEventArgs
+        {
+            ConfigName = config.Name,
+            Config = config
+        };
+
+        try
+        {
+            handler(this, args);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"ConfigChanged event handler error: {ex.Message}", ex);
+        }
     }
 
     private static T? ConvertValue<T>(object? value)
@@ -537,5 +598,36 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
         {
             return default;
         }
+    }
+
+    private static string MaskSdkKey(string sdkKey)
+    {
+        if (string.IsNullOrEmpty(sdkKey) || sdkKey.Length <= 8)
+        {
+            return "****";
+        }
+        return $"{sdkKey[..4]}...{sdkKey[^4..]}";
+    }
+
+    private static string FormatContext(ReplaneContext? context)
+    {
+        if (context == null || context.Count == 0)
+        {
+            return "{}";
+        }
+        var pairs = context.Select(kv => $"{kv.Key}={FormatValue(kv.Value)}");
+        return $"{{{string.Join(", ", pairs)}}}";
+    }
+
+    private static string FormatValue(object? value)
+    {
+        return value switch
+        {
+            null => "null",
+            string s => $"\"{s}\"",
+            bool b => b ? "true" : "false",
+            JsonElement je => je.ToString(),
+            _ => value.ToString() ?? "null"
+        };
     }
 }
