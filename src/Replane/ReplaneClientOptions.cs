@@ -37,4 +37,7 @@ public sealed class ReplaneClientOptions
 
     /// <summary>Enable debug logging. Default: false.</summary>
     public bool Debug { get; init; } = false;
+
+    /// <summary>Custom logger implementation. If null, uses console logger when Debug is true, otherwise no logging.</summary>
+    public IReplaneLogger? Logger { get; init; }
 }

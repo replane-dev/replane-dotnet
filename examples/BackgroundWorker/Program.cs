@@ -18,18 +18,19 @@ await using var client = new ReplaneClient(new ReplaneClientOptions
     }
 });
 
-// Subscribe to ALL config changes
-var unsubscribeAll = client.Subscribe((configName, config) =>
+// Subscribe to config changes using ConfigChanged event
+client.ConfigChanged += (sender, e) =>
 {
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Config changed: {configName} = {config.Value}");
-});
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Config changed: {e.ConfigName}");
 
-// Subscribe to a SPECIFIC config
-var unsubscribeBatchSize = client.SubscribeConfig("batch-size", config =>
-{
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Batch size updated to: {config.Value}");
-    Console.WriteLine("  -> Worker will adjust batch processing...");
-});
+    // Handle specific config changes
+    if (e.ConfigName == "batch-size")
+    {
+        var newBatchSize = e.GetValue<int>();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Batch size updated to: {newBatchSize}");
+        Console.WriteLine("  -> Worker will adjust batch processing...");
+    }
+};
 
 try
 {
@@ -90,9 +91,6 @@ while (!cts.Token.IsCancellationRequested)
     }
 }
 
-// Cleanup: unsubscribe
+// Cleanup
 Console.WriteLine("\nShutting down...");
-unsubscribeAll();
-unsubscribeBatchSize();
-Console.WriteLine("Unsubscribed from config changes.");
 Console.WriteLine("Done!");

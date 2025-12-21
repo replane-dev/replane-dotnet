@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Replane" Version="0.1.0" />
+    <PackageReference Include="Replane" Version="0.1.4" />
   </ItemGroup>
 
 </Project>

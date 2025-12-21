@@ -1,17 +1,16 @@
 using Replane;
-using Replane.Testing;
 
 namespace UnitTesting.Services;
 
 /// <summary>
 /// Example service that uses Replane for feature flags and configuration.
-/// This demonstrates how to structure code for testability.
+/// This demonstrates how to structure code for testability by depending on IReplaneClient.
 /// </summary>
 public class PricingService
 {
-    private readonly InMemoryReplaneClient _config;
+    private readonly IReplaneClient _config;
 
-    public PricingService(InMemoryReplaneClient config)
+    public PricingService(IReplaneClient config)
     {
         _config = config;
     }

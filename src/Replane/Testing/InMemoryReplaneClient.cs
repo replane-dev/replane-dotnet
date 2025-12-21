@@ -4,10 +4,10 @@ namespace Replane.Testing;
 
 /// <summary>
 /// An in-memory Replane client for testing.
-/// Provides the same interface as ReplaneClient but stores all configs in memory.
+/// Implements IReplaneClient so it can be used as a drop-in replacement for ReplaneClient.
 /// Useful for unit tests where you don't want to connect to a real Replane server.
 /// </summary>
-public sealed class InMemoryReplaneClient : IDisposable
+public sealed class InMemoryReplaneClient : IReplaneClient
 {
     private readonly Dictionary<string, Config> _configs = new(StringComparer.Ordinal);
     private readonly ReplaneContext _context;

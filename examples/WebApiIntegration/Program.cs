@@ -20,12 +20,8 @@ var replaneClient = new ReplaneClient(new ReplaneClientOptions
     }
 });
 
-// Register the client as a singleton
-builder.Services.AddSingleton(replaneClient);
-
-// Add services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Register the client as the interface for easy testing/mocking
+builder.Services.AddSingleton<IReplaneClient>(replaneClient);
 
 var app = builder.Build();
 
@@ -40,17 +36,10 @@ catch (ReplaneException ex)
     app.Logger.LogWarning("Running with fallback configs: {Message}", ex.Message);
 }
 
-// Configure Swagger
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 // Middleware: Check maintenance mode
 app.Use(async (context, next) =>
 {
-    var client = context.RequestServices.GetRequiredService<ReplaneClient>();
+    var client = context.RequestServices.GetRequiredService<IReplaneClient>();
     var maintenanceMode = client.Get<bool>("maintenance-mode");
 
     if (maintenanceMode && !context.Request.Path.StartsWithSegments("/health"))
@@ -64,7 +53,7 @@ app.Use(async (context, next) =>
 });
 
 // Endpoints
-app.MapGet("/", (ReplaneClient client) =>
+app.MapGet("/", (IReplaneClient client) =>
 {
     var message = client.Get<string>("welcome-message");
     return new { message };
@@ -72,7 +61,7 @@ app.MapGet("/", (ReplaneClient client) =>
 
 app.MapGet("/health", () => new { status = "healthy" });
 
-app.MapGet("/config/{name}", (string name, ReplaneClient client) =>
+app.MapGet("/config/{name}", (string name, IReplaneClient client) =>
 {
     try
     {
@@ -85,7 +74,7 @@ app.MapGet("/config/{name}", (string name, ReplaneClient client) =>
     }
 });
 
-app.MapGet("/features", (HttpContext http, ReplaneClient client) =>
+app.MapGet("/features", (HttpContext http, IReplaneClient client) =>
 {
     // Extract user context from request (e.g., from headers or JWT)
     var userId = http.Request.Headers["X-User-Id"].FirstOrDefault() ?? "anonymous";

@@ -31,7 +31,7 @@ public sealed class ConfigChangedEventArgs : EventArgs
 /// Maintains a persistent SSE connection to receive real-time config updates.
 /// Config reads are synchronous and return immediately from the local cache.
 /// </summary>
-public sealed class ReplaneClient : IDisposable, IAsyncDisposable
+public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
 {
     private readonly ReplaneClientOptions _options;
     private readonly HttpClient _httpClient;
@@ -55,10 +55,10 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     /// <summary>
     /// Creates a new Replane client.
     /// </summary>
-    public ReplaneClient(ReplaneClientOptions options, IReplaneLogger? logger = null)
+    public ReplaneClient(ReplaneClientOptions options)
     {
         _options = options;
-        _logger = logger ?? (options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
+        _logger = options.Logger ?? (options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
 
         _logger.LogDebug($"Initializing ReplaneClient with options:");
         _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");

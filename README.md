@@ -360,6 +360,88 @@ public void TestComplexTypeWithOverrides()
 }
 ```
 
+## Dependency Injection
+
+Both `ReplaneClient` and `InMemoryReplaneClient` implement the `IReplaneClient` interface, making it easy to swap implementations for testing or use with dependency injection:
+
+### ASP.NET Core Registration
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// Register Replane client as the interface
+builder.Services.AddSingleton<IReplaneClient>(sp =>
+{
+    var client = new ReplaneClient(new ReplaneClientOptions
+    {
+        BaseUrl = builder.Configuration["Replane:BaseUrl"]!,
+        SdkKey = builder.Configuration["Replane:SdkKey"]!
+    });
+    return client;
+});
+
+var app = builder.Build();
+
+// Connect on startup
+var replane = app.Services.GetRequiredService<IReplaneClient>();
+if (replane is ReplaneClient realClient)
+{
+    await realClient.ConnectAsync();
+}
+
+// Use in controllers/services
+app.MapGet("/api/items", (IReplaneClient replane) =>
+{
+    var maxItems = replane.Get<int>("max-items", defaultValue: 100);
+    return Results.Ok(new { maxItems });
+});
+
+app.Run();
+```
+
+### Using in Services
+
+```csharp
+public class FeatureService
+{
+    private readonly IReplaneClient _replane;
+
+    public FeatureService(IReplaneClient replane)
+    {
+        _replane = replane;
+    }
+
+    public bool IsFeatureEnabled(string userId)
+    {
+        return _replane.Get<bool>("new-feature", new ReplaneContext
+        {
+            ["user_id"] = userId
+        });
+    }
+}
+```
+
+### Testing with DI
+
+```csharp
+[Fact]
+public void TestFeatureService()
+{
+    // Create test client implementing IReplaneClient
+    using var testClient = TestClient.Create(new Dictionary<string, object?>
+    {
+        ["new-feature"] = true
+    });
+
+    // Inject into service
+    var service = new FeatureService(testClient);
+
+    // Test the service
+    service.IsFeatureEnabled("user-123").Should().BeTrue();
+}
+```
+
 ## Configuration Options
 
 | Option                    | Type                          | Default  | Description                     |
@@ -375,6 +457,7 @@ public void TestComplexTypeWithOverrides()
 | `InactivityTimeoutMs`     | `int`                         | `30000`  | SSE inactivity timeout          |
 | `HttpClient`              | `HttpClient`                  | `null`   | Custom HttpClient               |
 | `Debug`                   | `bool`                        | `false`  | Enable debug logging            |
+| `Logger`                  | `IReplaneLogger`              | `null`   | Custom logger implementation    |
 
 ## Debug Logging
 
@@ -427,7 +510,12 @@ public class MyLogger : IReplaneLogger
     }
 }
 
-var replane = new ReplaneClient(options, new MyLogger());
+var replane = new ReplaneClient(new ReplaneClientOptions
+{
+    BaseUrl = "https://your-server.com",
+    SdkKey = "your-key",
+    Logger = new MyLogger()
+});
 ```
 
 ## Condition Operators
