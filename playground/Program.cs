@@ -13,8 +13,8 @@ var options = new ReplaneClientOptions
 {
     BaseUrl = baseUrl,
     SdkKey = sdkKey,
-    Debug = true, // Enable debug logging to see what's happening
-    InitializationTimeoutMs = 10000,
+    Debug = true,
+    InitializationTimeoutMs = 1000,
     // Fallbacks for when server is unavailable
     Fallbacks = new Dictionary<string, object?>
     {

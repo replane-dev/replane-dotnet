@@ -286,6 +286,16 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
             {
                 return;
             }
+            catch (ObjectDisposedException) when (_closed || cancellationToken.IsCancellationRequested)
+            {
+                // Disposed during shutdown
+                return;
+            }
+            catch (IOException) when (_closed || cancellationToken.IsCancellationRequested)
+            {
+                // Network stream can throw during shutdown
+                return;
+            }
             catch (Exception ex)
             {
                 var error = ex is ReplaneException re ? re : new NetworkException(ex.Message, ex);
@@ -368,40 +378,49 @@ public sealed class ReplaneClient : IDisposable, IAsyncDisposable
     {
         var parser = new SseParser();
         var buffer = new byte[4096];
-        var lastEventTime = DateTime.UtcNow;
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
 
+        // Set read timeout for inactivity detection
+        // Note: We use the inactivity timeout as the read timeout. If no data comes within this time,
+        // the read will be cancelled and we'll reconnect.
+        using var inactivityCts = new CancellationTokenSource();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, inactivityCts.Token);
+
         while (!cancellationToken.IsCancellationRequested)
         {
-            // Use short timeout to check inactivity
-            using var readCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, readCts.Token);
+            // Reset inactivity timer before each read
+            inactivityCts.CancelAfter(_options.InactivityTimeoutMs);
 
             int bytesRead;
             try
             {
                 bytesRead = await stream.ReadAsync(buffer, linkedCts.Token);
             }
-            catch (OperationCanceledException) when (readCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (inactivityCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                // Check inactivity timeout
-                var elapsed = DateTime.UtcNow - lastEventTime;
-                if (elapsed.TotalMilliseconds > _options.InactivityTimeoutMs)
-                {
-                    _logger.LogDebug("SSE inactivity timeout, reconnecting...");
-                    break;
-                }
-                continue;
+                _logger.LogDebug($"SSE inactivity timeout after {_options.InactivityTimeoutMs}ms, reconnecting...");
+                break;
+            }
+            catch (ObjectDisposedException)
+            {
+                // Stream was disposed - connection closed
+                _logger.LogDebug("SSE stream disposed");
+                break;
+            }
+            catch (IOException)
+            {
+                // Network error - connection lost
+                _logger.LogDebug("SSE stream IO error");
+                break;
             }
 
             if (bytesRead == 0)
             {
-                _logger.LogDebug("SSE stream ended");
+                _logger.LogDebug("SSE stream ended (server closed connection)");
                 break;
             }
 
-            lastEventTime = DateTime.UtcNow;
             var text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
             _logger.LogDebug($"Received chunk: {bytesRead} bytes");
 
