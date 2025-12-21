@@ -16,9 +16,12 @@ echo ""
 echo "What do you want to bump?"
 echo "  1) major ($MAJOR.$MINOR.$PATCH -> $((MAJOR + 1)).0.0)"
 echo "  2) minor ($MAJOR.$MINOR.$PATCH -> $MAJOR.$((MINOR + 1)).0)"
-echo "  3) patch ($MAJOR.$MINOR.$PATCH -> $MAJOR.$MINOR.$((PATCH + 1)))"
+echo "  3) patch ($MAJOR.$MINOR.$PATCH -> $MAJOR.$MINOR.$((PATCH + 1))) [default]"
 echo ""
-read -p "Enter choice [1-3]: " CHOICE
+read -p "Enter choice [1-3, default=3]: " CHOICE
+
+# Default to patch if empty
+CHOICE=${CHOICE:-3}
 
 case $CHOICE in
     1)
