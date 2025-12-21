@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Community Discussions
+    url: https://github.com/orgs/replane-dev/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: Documentation
+    url: https://replane.dev/docs/sdk/dotnet
+    about: Check the .NET SDK documentation
+
