@@ -1,15 +1,17 @@
 #!/bin/bash
 set -e
 
-# Get the latest version tag
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-echo "Current version: $LATEST_TAG"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CSPROJ_PATH="$SCRIPT_DIR/../src/Replane/Replane.csproj"
+
+# Get current version from .csproj
+CURRENT_VERSION=$(grep '<Version>' "$CSPROJ_PATH" | sed 's/.*<Version>\(.*\)<\/Version>.*/\1/')
+echo "Current version: $CURRENT_VERSION"
 
 # Parse version numbers
-VERSION=${LATEST_TAG#v}
-MAJOR=$(echo "$VERSION" | cut -d. -f1)
-MINOR=$(echo "$VERSION" | cut -d. -f2)
-PATCH=$(echo "$VERSION" | cut -d. -f3)
+MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
 
 # Ask user what to bump
 echo ""
@@ -42,20 +44,31 @@ case $CHOICE in
         ;;
 esac
 
-NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+NEW_TAG="v$NEW_VERSION"
 echo ""
-echo "New version: $NEW_TAG"
-read -p "Create and push tag? [y/N]: " CONFIRM
+echo "New version: $NEW_VERSION"
+read -p "Update .csproj, commit, tag, and push? [y/N]: " CONFIRM
 
 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+    # Update .csproj
+    sed -i '' "s|<Version>$CURRENT_VERSION</Version>|<Version>$NEW_VERSION</Version>|" "$CSPROJ_PATH"
+    echo "Updated $CSPROJ_PATH to version $NEW_VERSION"
+
+    # Commit the change
+    git add "$CSPROJ_PATH"
+    git commit -m "chore: bump version to $NEW_VERSION"
+    echo "Committed version bump"
+
+    # Create and push tag
     git tag "$NEW_TAG"
     echo "Created tag $NEW_TAG"
 
-    git push origin "$NEW_TAG"
-    echo "Pushed tag $NEW_TAG to origin"
+    git push origin HEAD "$NEW_TAG"
+    echo "Pushed changes and tag $NEW_TAG to origin"
 
     echo ""
-    echo "Done! Version $NEW_TAG has been tagged and pushed."
+    echo "Done! Version $NEW_VERSION has been released."
 else
     echo "Aborted."
     exit 0

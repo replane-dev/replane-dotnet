@@ -34,10 +34,19 @@ public sealed class ConfigChangedEventArgs : EventArgs
 /// </summary>
 public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
 {
-    private static readonly string SdkVersion = Assembly.GetExecutingAssembly()
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
-        ?? "unknown";
+    private static readonly string SdkVersion = GetSdkVersion();
+
+    private static string GetSdkVersion()
+    {
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+            ?? "unknown";
+
+        // Strip git commit hash suffix (e.g., "0.1.0+abc123" -> "0.1.0")
+        var plusIndex = version.IndexOf('+');
+        return plusIndex >= 0 ? version[..plusIndex] : version;
+    }
 
     private static readonly string DefaultAgent = $"replane-dotnet/{SdkVersion}";
 

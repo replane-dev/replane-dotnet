@@ -4,28 +4,43 @@ namespace Replane.Tests;
 
 public class SdkMetadataTests
 {
-    [Fact]
-    public void SdkVersion_IsExtractedFromAssembly()
+    private static string GetCleanVersion()
     {
-        // Get the version the same way ReplaneClient does
-        var assembly = typeof(ReplaneClient).Assembly;
-        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? assembly.GetName().Version?.ToString()
+        var version = typeof(ReplaneClient).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? typeof(ReplaneClient).Assembly.GetName().Version?.ToString()
             ?? "unknown";
 
-        version.Should().NotBeNullOrEmpty();
-        version.Should().NotBe("unknown");
-        version.Should().MatchRegex(@"^\d+\.\d+\.\d+");
+        // Strip git commit hash suffix (e.g., "0.1.0+abc123" -> "0.1.0")
+        var plusIndex = version.IndexOf('+');
+        return plusIndex >= 0 ? version[..plusIndex] : version;
     }
 
     [Fact]
-    public void SdkVersion_MatchesCsprojVersion()
+    public void SdkVersion_IsExtractedFromAssembly()
     {
-        var assembly = typeof(ReplaneClient).Assembly;
-        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? assembly.GetName().Version?.ToString();
+        var version = GetCleanVersion();
 
-        // The version in .csproj is 0.1.0
-        version.Should().StartWith("0.1.0");
+        version.Should().NotBeNullOrEmpty();
+        version.Should().NotBe("unknown");
+        version.Should().MatchRegex(@"^\d+\.\d+\.\d+$");
+    }
+
+    [Fact]
+    public void SdkVersion_IsValidSemver()
+    {
+        var version = GetCleanVersion();
+
+        // Should be a valid semver format (major.minor.patch)
+        version.Should().MatchRegex(@"^\d+\.\d+\.\d+$");
+    }
+
+    [Fact]
+    public void SdkVersion_DoesNotContainGitHash()
+    {
+        var version = GetCleanVersion();
+
+        // Should not contain the + suffix with git hash
+        version.Should().NotContain("+");
     }
 }
