@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 
@@ -33,10 +34,18 @@ public sealed class ConfigChangedEventArgs : EventArgs
 /// </summary>
 public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
 {
+    private static readonly string SdkVersion = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+        ?? "unknown";
+
+    private static readonly string DefaultAgent = $"replane-dotnet/{SdkVersion}";
+
     private readonly ReplaneClientOptions _options;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
     private readonly IReplaneLogger _logger;
+    private readonly string _agent;
 
     private readonly ConcurrentDictionary<string, Config> _configs = new(StringComparer.Ordinal);
 
@@ -59,6 +68,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
     {
         _options = options;
         _logger = options.Logger ?? (options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
+        _agent = options.Agent ?? DefaultAgent;
 
         _logger.LogDebug($"Initializing ReplaneClient with options:");
         _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");
@@ -341,6 +351,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.SdkKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
+        request.Headers.Add("X-Replane-Agent", _agent);
         request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
         using var timeoutCts = new CancellationTokenSource(_options.RequestTimeoutMs);
