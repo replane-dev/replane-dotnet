@@ -360,7 +360,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.SdkKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
-        request.Headers.Add("X-Replane-Agent", _agent);
+        request.Headers.UserAgent.ParseAdd(_agent);
         request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
         using var timeoutCts = new CancellationTokenSource(_options.RequestTimeoutMs);

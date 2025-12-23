@@ -41,6 +41,6 @@ public sealed class ReplaneClientOptions
     /// <summary>Custom logger implementation. If null, uses console logger when Debug is true, otherwise no logging.</summary>
     public IReplaneLogger? Logger { get; init; }
 
-    /// <summary>Agent identifier sent in X-Replane-Agent header. Defaults to SDK identifier.</summary>
+    /// <summary>Agent identifier sent in User-Agent header. Defaults to SDK identifier.</summary>
     public string? Agent { get; init; }
 }
