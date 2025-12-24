@@ -70,18 +70,18 @@ public class ClientIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ConnectAsync_WithFallbacks_UsesFallbacksBeforeInit()
+    public async Task ConnectAsync_WithDefaults_UsesDefaultsBeforeInit()
     {
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["fallback-config"] = "fallback-value" }
+            Defaults = new Dictionary<string, object?> { ["default-config"] = "default-value" }
         });
 
-        // Before connecting, fallback should be available
-        var value = client.Get<string>("fallback-config");
-        value.Should().Be("fallback-value");
+        // Before connecting, default should be available
+        var value = client.Get<string>("default-config");
+        value.Should().Be("default-value");
     }
 
     [Fact]
@@ -498,22 +498,22 @@ public class ClientIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_BeforeConnect_WithFallback_ReturnsFallback()
+    public async Task Get_BeforeConnect_WithDefault_ReturnsDefault()
     {
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["my-config"] = "fallback" }
+            Defaults = new Dictionary<string, object?> { ["my-config"] = "default" }
         });
 
         // Not connected yet
         var value = client.Get<string>("my-config");
-        value.Should().Be("fallback");
+        value.Should().Be("default");
     }
 
     [Fact]
-    public async Task Get_BeforeConnect_WithoutFallback_ThrowsException()
+    public async Task Get_BeforeConnect_WithoutDefault_ThrowsException()
     {
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
@@ -958,31 +958,31 @@ public class ClientIntegrationTests : IAsyncLifetime
         client.Get<string>("context-override-test", new ReplaneContext { ["region"] = "eu" }).Should().Be("eu-value");
     }
 
-    // Fallback tests
+    // Default tests
 
     [Fact]
-    public async Task Get_ServerConfigOverridesFallback()
+    public async Task Get_ServerConfigOverridesDefault()
     {
-        _server.AddConfig("override-fallback", "server-value");
+        _server.AddConfig("override-default", "server-value");
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["override-fallback"] = "fallback-value" }
+            Defaults = new Dictionary<string, object?> { ["override-default"] = "default-value" }
         });
 
-        // Before connect, fallback is used
-        client.Get<string>("override-fallback").Should().Be("fallback-value");
+        // Before connect, default is used
+        client.Get<string>("override-default").Should().Be("default-value");
 
         await client.ConnectAsync();
 
         // After connect, server value wins
-        client.Get<string>("override-fallback").Should().Be("server-value");
+        client.Get<string>("override-default").Should().Be("server-value");
     }
 
     [Fact]
-    public async Task Get_FallbackUsedForMissingConfig()
+    public async Task Get_DefaultUsedForMissingConfig()
     {
         _server.AddConfig("existing", "value");
 
@@ -990,7 +990,7 @@ public class ClientIntegrationTests : IAsyncLifetime
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["missing-config"] = "fallback" }
+            Defaults = new Dictionary<string, object?> { ["missing-config"] = "default" }
         });
 
         await client.ConnectAsync();
@@ -998,8 +998,8 @@ public class ClientIntegrationTests : IAsyncLifetime
         // Existing config
         client.Get<string>("existing").Should().Be("value");
 
-        // Missing config uses fallback
-        client.Get<string>("missing-config").Should().Be("fallback");
+        // Missing config uses default
+        client.Get<string>("missing-config").Should().Be("default");
     }
 
     // ==================== Complex Type Tests ====================
@@ -1380,26 +1380,26 @@ public class ClientIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_ComplexTypeFallback_UsedBeforeConnect()
+    public async Task Get_ComplexTypeDefault_UsedBeforeConnect()
     {
-        var fallbackTheme = new IntegrationThemeConfig { DarkMode = true, PrimaryColor = "#FALLBACK", FontSize = 10 };
+        var defaultTheme = new IntegrationThemeConfig { DarkMode = true, PrimaryColor = "#DEFAULT", FontSize = 10 };
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["theme"] = fallbackTheme }
+            Defaults = new Dictionary<string, object?> { ["theme"] = defaultTheme }
         });
 
         // Before connect
         var result = client.Get<IntegrationThemeConfig>("theme");
-        result!.PrimaryColor.Should().Be("#FALLBACK");
+        result!.PrimaryColor.Should().Be("#DEFAULT");
     }
 
     [Fact]
-    public async Task Get_ComplexTypeFallback_ServerOverrides()
+    public async Task Get_ComplexTypeDefault_ServerOverrides()
     {
-        var fallbackTheme = new IntegrationThemeConfig { DarkMode = true, PrimaryColor = "#FALLBACK", FontSize = 10 };
+        var defaultTheme = new IntegrationThemeConfig { DarkMode = true, PrimaryColor = "#DEFAULT", FontSize = 10 };
         var serverTheme = new IntegrationThemeConfig { DarkMode = false, PrimaryColor = "#SERVER", FontSize = 14 };
 
         _server.AddConfig("theme", serverTheme);
@@ -1408,11 +1408,11 @@ public class ClientIntegrationTests : IAsyncLifetime
         {
             BaseUrl = _server.BaseUrl,
             SdkKey = _server.SdkKey,
-            Fallbacks = new Dictionary<string, object?> { ["theme"] = fallbackTheme }
+            Defaults = new Dictionary<string, object?> { ["theme"] = defaultTheme }
         });
 
-        // Before connect - fallback
-        client.Get<IntegrationThemeConfig>("theme")!.PrimaryColor.Should().Be("#FALLBACK");
+        // Before connect - default
+        client.Get<IntegrationThemeConfig>("theme")!.PrimaryColor.Should().Be("#DEFAULT");
 
         await client.ConnectAsync();
 

@@ -14,8 +14,8 @@ public sealed class ReplaneClientOptions
     /// <summary>Default context for override evaluation.</summary>
     public ReplaneContext? Context { get; init; }
 
-    /// <summary>Fallback values for configs if not loaded from server.</summary>
-    public Dictionary<string, object?>? Fallbacks { get; init; }
+    /// <summary>Default values for configs if not loaded from server.</summary>
+    public Dictionary<string, object?>? Defaults { get; init; }
 
     /// <summary>List of config names that must be present on init.</summary>
     public IReadOnlyList<string>? Required { get; init; }

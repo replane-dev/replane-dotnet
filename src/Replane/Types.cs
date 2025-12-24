@@ -220,7 +220,7 @@ public static class JsonValueConverter
     }
 
     /// <summary>
-    /// Creates a JsonElement from a .NET object (for testing/fallbacks).
+    /// Creates a JsonElement from a .NET object (for testing/defaults).
     /// </summary>
     public static JsonElement ToJsonElement(object? value)
     {

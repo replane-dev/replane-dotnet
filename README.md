@@ -153,16 +153,16 @@ replane.ConfigChanged += OnConfigChanged;
 replane.ConfigChanged -= OnConfigChanged;
 ```
 
-### Fallback Values
+### Default Values
 
-Provide fallback values for when configs aren't loaded:
+Provide default values for when configs aren't loaded:
 
 ```csharp
 var replane = new ReplaneClient(new ReplaneClientOptions
 {
     BaseUrl = "https://your-server.com",
     SdkKey = "your-key",
-    Fallbacks = new Dictionary<string, object?>
+    Defaults = new Dictionary<string, object?>
     {
         ["feature-enabled"] = false,
         ["rate-limit"] = 100
@@ -449,7 +449,7 @@ public void TestFeatureService()
 | `BaseUrl`                 | `string`                      | required | Replane server URL              |
 | `SdkKey`                  | `string`                      | required | SDK key for authentication      |
 | `Context`                 | `ReplaneContext`              | `null`   | Default context for evaluations |
-| `Fallbacks`               | `Dictionary<string, object?>` | `null`   | Fallback values                 |
+| `Defaults`                | `Dictionary<string, object?>` | `null`   | Default values                  |
 | `Required`                | `IReadOnlyList<string>`       | `null`   | Required config names           |
 | `RequestTimeoutMs`        | `int`                         | `2000`   | HTTP request timeout            |
 | `InitializationTimeoutMs` | `int`                         | `5000`   | Initial connection timeout      |
@@ -458,6 +458,7 @@ public void TestFeatureService()
 | `HttpClient`              | `HttpClient`                  | `null`   | Custom HttpClient               |
 | `Debug`                   | `bool`                        | `false`  | Enable debug logging            |
 | `Logger`                  | `IReplaneLogger`              | `null`   | Custom logger implementation    |
+| `Agent`                   | `string`                      | `null`   | Agent identifier for User-Agent |
 
 ## Debug Logging
 

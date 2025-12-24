@@ -91,9 +91,9 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         {
             _logger.LogDebug($"  Default context: {FormatContext(options.Context)}");
         }
-        if (options.Fallbacks != null && options.Fallbacks.Count > 0)
+        if (options.Defaults != null && options.Defaults.Count > 0)
         {
-            _logger.LogDebug($"  Fallbacks: [{string.Join(", ", options.Fallbacks.Keys)}]");
+            _logger.LogDebug($"  Defaults: [{string.Join(", ", options.Defaults.Keys)}]");
         }
         if (options.Required != null && options.Required.Count > 0)
         {
@@ -116,14 +116,14 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
             _logger.LogDebug("  Created new HttpClient");
         }
 
-        // Initialize fallbacks
-        if (options.Fallbacks != null)
+        // Initialize defaults
+        if (options.Defaults != null)
         {
-            foreach (var (name, value) in options.Fallbacks)
+            foreach (var (name, value) in options.Defaults)
             {
                 var jsonValue = JsonValueConverter.ToJsonElement(value);
                 _configs[name] = new Config { Name = name, Value = jsonValue };
-                _logger.LogDebug($"  Registered fallback: {name} = {FormatValue(value)}");
+                _logger.LogDebug($"  Registered default: {name} = {FormatValue(value)}");
             }
         }
 
