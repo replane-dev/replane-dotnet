@@ -10,7 +10,7 @@
 
     <!-- Package Info -->
     <PackageId>Replane</PackageId>
-    <Version>0.1.12</Version>
+    <Version>0.1.13</Version>
     <Authors>Replane</Authors>
     <Description>Replane SDK for .NET - Feature flags and remote configuration client</Description>
     <PackageTags>feature-flags;remote-config;configuration;replane</PackageTags>
