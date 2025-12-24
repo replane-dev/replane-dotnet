@@ -39,17 +39,6 @@ jobs:
       - name: Run tests
         run: dotnet test --configuration Release --no-build --verbosity normal
 
-      - name: Print ref
-        run: |
-          echo "github.ref: ${{ github.ref }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "github.ref_type: ${{ github.ref_type }}"
-          echo "github.ref_prefix: ${{ github.ref_prefix }}"
-          echo "github.ref_suffix: ${{ github.ref_suffix }}"
-          echo "github.ref_segments: ${{ github.ref_segments }}"
-          echo "github.ref_segments_count: ${{ github.ref_segments_count }}"
-          echo "github.ref_segments_array: ${{ github.ref_segments_array }}"
-
   publish:
     needs: build_test
     runs-on: ubuntu-latest
