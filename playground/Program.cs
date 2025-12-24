@@ -15,8 +15,8 @@ var options = new ReplaneClientOptions
     SdkKey = sdkKey,
     Debug = true,
     InitializationTimeoutMs = 1000,
-    // Fallbacks for when server is unavailable
-    Fallbacks = new Dictionary<string, object?>
+    // Defaults for when server is unavailable
+    Defaults = new Dictionary<string, object?>
     {
         ["feature-flag"] = false,
         ["max-items"] = 10
@@ -96,10 +96,10 @@ catch (AuthenticationException)
 catch (ReplaneTimeoutException ex)
 {
     Console.WriteLine($"ERROR: Connection timed out after {ex.TimeoutMs}ms");
-    Console.WriteLine("Using fallback values instead.");
+    Console.WriteLine("Using default values instead.");
 
     var featureFlag = client.Get<bool>("feature-flag", defaultValue: false);
-    Console.WriteLine($"feature-flag (fallback) = {featureFlag}");
+    Console.WriteLine($"feature-flag (default) = {featureFlag}");
 }
 catch (Exception ex)
 {
