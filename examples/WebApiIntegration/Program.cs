@@ -11,7 +11,7 @@ var replaneClient = new ReplaneClient(new ReplaneClientOptions
     SdkKey = builder.Configuration["Replane:SdkKey"]
              ?? Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
              ?? "your-sdk-key",
-    Fallbacks = new Dictionary<string, object?>
+    Defaults = new Dictionary<string, object?>
     {
         ["api-rate-limit"] = 100,
         ["premium-feature-enabled"] = false,
@@ -33,7 +33,7 @@ try
 }
 catch (ReplaneException ex)
 {
-    app.Logger.LogWarning("Running with fallback configs: {Message}", ex.Message);
+    app.Logger.LogWarning("Running with default configs: {Message}", ex.Message);
 }
 
 // Middleware: Check maintenance mode

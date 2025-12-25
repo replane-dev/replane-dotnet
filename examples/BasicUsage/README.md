@@ -11,12 +11,14 @@ A simple console application demonstrating basic Replane SDK usage.
 ## Setup
 
 1. Copy this directory to your local machine:
+
    ```bash
    cp -r BasicUsage ~/my-replane-example
    cd ~/my-replane-example
    ```
 
 2. Set your environment variables:
+
    ```bash
    export REPLANE_BASE_URL="https://your-replane-server.com"
    export REPLANE_SDK_KEY="your-sdk-key"
@@ -51,20 +53,21 @@ Expected error: Config 'non-existent-config' not found
 - Creating and configuring a `ReplaneClient`
 - Connecting to the Replane server
 - Reading typed config values with `Get<T>()`
-- Using default/fallback values
+- Using default values
 - Proper error handling
 - Resource cleanup with `DisposeAsync()`
 
 ## Key Concepts
 
-### Fallback Values
+### Default Values
 
-Fallback values are used when:
+Default values are used when:
+
 - The server hasn't sent a config yet
 - The config doesn't exist on the server
 
 ```csharp
-Fallbacks = new Dictionary<string, object?>
+Defaults = new Dictionary<string, object?>
 {
     ["feature-enabled"] = false,
     ["max-items"] = 10
@@ -83,6 +86,7 @@ var timeout = client.Get<int>("timeout-ms", defaultValue: 5000);
 ### Error Handling
 
 The SDK throws specific exceptions:
+
 - `AuthenticationException` - Invalid SDK key
 - `ConfigNotFoundException` - Config not found (and no default provided)
 - `ReplaneTimeoutException` - Connection or request timeout

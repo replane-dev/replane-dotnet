@@ -18,8 +18,8 @@ await using var client = new ReplaneClient(new ReplaneClientOptions
         ["platform"] = "console"
     },
 
-    // Fallbacks for demo purposes
-    Fallbacks = new Dictionary<string, object?>
+    // Defaults for demo purposes
+    Defaults = new Dictionary<string, object?>
     {
         ["premium-feature"] = false,
         ["rate-limit"] = 100,
@@ -34,7 +34,7 @@ try
 }
 catch (ReplaneException ex)
 {
-    Console.WriteLine($"Note: Running with fallbacks only ({ex.Message})\n");
+    Console.WriteLine($"Note: Running with defaults only ({ex.Message})\n");
 }
 
 // Simulate different users

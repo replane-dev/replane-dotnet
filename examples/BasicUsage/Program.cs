@@ -11,8 +11,8 @@ var client = new ReplaneClient(new ReplaneClientOptions
     SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
              ?? "your-sdk-key",
 
-    // Optional: Fallback values if server is unavailable
-    Fallbacks = new Dictionary<string, object?>
+    // Optional: Default values if server is unavailable
+    Defaults = new Dictionary<string, object?>
     {
         ["feature-enabled"] = false,
         ["max-items"] = 10

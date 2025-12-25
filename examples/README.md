@@ -4,25 +4,27 @@ This directory contains example projects demonstrating various uses of the Repla
 
 ## Examples
 
-| Example | Description |
-|---------|-------------|
-| [BasicUsage](./BasicUsage/) | Simple console app with basic config reading |
-| [ConsoleWithOverrides](./ConsoleWithOverrides/) | Context-based overrides and user segmentation |
-| [BackgroundWorker](./BackgroundWorker/) | Long-running service with real-time config updates |
-| [WebApiIntegration](./WebApiIntegration/) | ASP.NET Core Web API with middleware and DI |
-| [UnitTesting](./UnitTesting/) | Unit testing with the in-memory test client |
+| Example                                         | Description                                        |
+| ----------------------------------------------- | -------------------------------------------------- |
+| [BasicUsage](./BasicUsage/)                     | Simple console app with basic config reading       |
+| [ConsoleWithOverrides](./ConsoleWithOverrides/) | Context-based overrides and user segmentation      |
+| [BackgroundWorker](./BackgroundWorker/)         | Long-running service with real-time config updates |
+| [WebApiIntegration](./WebApiIntegration/)       | ASP.NET Core Web API with middleware and DI        |
+| [UnitTesting](./UnitTesting/)                   | Unit testing with the in-memory test client        |
 
 ## Quick Start
 
 Each example is a self-contained project. To run any example:
 
 1. **Copy the example directory** to your local machine:
+
    ```bash
    cp -r <example-name> ~/my-example
    cd ~/my-example
    ```
 
 2. **Set environment variables** (or edit the code):
+
    ```bash
    export REPLANE_BASE_URL="https://your-replane-server.com"
    export REPLANE_SDK_KEY="your-sdk-key"
@@ -107,6 +109,6 @@ var service = new MyService(config);
 
 ## Notes
 
-- All examples use fallback values, so they'll work even without a server
+- All examples use default values, so they'll work even without a server
 - Each example has its own README with detailed instructions
 - Examples reference the `Replane` NuGet package (version 0.1.0)

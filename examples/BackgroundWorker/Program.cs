@@ -10,7 +10,7 @@ await using var client = new ReplaneClient(new ReplaneClientOptions
               ?? "https://your-replane-server.com",
     SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
              ?? "your-sdk-key",
-    Fallbacks = new Dictionary<string, object?>
+    Defaults = new Dictionary<string, object?>
     {
         ["worker-enabled"] = true,
         ["batch-size"] = 100,
@@ -40,7 +40,7 @@ try
 }
 catch (ReplaneException ex)
 {
-    Console.WriteLine($"Note: Running with fallbacks ({ex.Message})\n");
+    Console.WriteLine($"Note: Running with defaults ({ex.Message})\n");
 }
 
 // Simulate a background worker
