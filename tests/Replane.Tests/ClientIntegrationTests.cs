@@ -38,6 +38,14 @@ public class ClientIntegrationTests : IAsyncLifetime
     private static JsonElement ToJson(object? value) => JsonValueConverter.ToJsonElement(value);
     private MockReplaneServer _server = null!;
 
+    // Helper to create ConnectOptions from server
+    private ConnectOptions GetConnectOptions(int? initTimeoutMs = null, string? sdkKey = null) => new ConnectOptions
+    {
+        BaseUrl = _server.BaseUrl,
+        SdkKey = sdkKey ?? _server.SdkKey,
+        InitializationTimeoutMs = initTimeoutMs ?? 5000
+    };
+
     public async Task InitializeAsync()
     {
         _server = new MockReplaneServer();
@@ -56,13 +64,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         _server.AddConfig("feature-enabled", true);
         _server.AddConfig("max-items", 100);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.IsInitialized.Should().BeTrue();
         client.Get<bool>("feature-enabled").Should().BeTrue();
@@ -74,8 +78,6 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["default-config"] = "default-value" }
         });
 
@@ -89,13 +91,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.SimulateAuthError = true;
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = "invalid-key"
-        });
+        await using var client = new ReplaneClient();
 
-        var act = () => client.ConnectAsync();
+        var act = () => client.ConnectAsync(GetConnectOptions(sdkKey: "invalid-key"));
 
         await act.Should().ThrowAsync<AuthenticationException>();
     }
@@ -105,14 +103,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.InitDelay = TimeSpan.FromSeconds(10);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
-            InitializationTimeoutMs = 100
-        });
+        await using var client = new ReplaneClient();
 
-        var act = () => client.ConnectAsync();
+        var act = () => client.ConnectAsync(GetConnectOptions(initTimeoutMs: 100));
 
         await act.Should().ThrowAsync<ReplaneTimeoutException>();
     }
@@ -144,13 +137,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Free user - should get false
         client.Get<bool>("premium-feature", new ReplaneContext { ["plan"] = "free" })
@@ -186,12 +175,10 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Context = new ReplaneContext { ["region"] = "us" }
         });
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Only default context - no match
         client.Get<string>("test-config").Should().Be("default");
@@ -204,13 +191,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Get_ConfigNotFound_ThrowsException()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var act = () => client.Get<string>("non-existent-config");
 
@@ -221,13 +204,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Get_ConfigNotFound_WithDefault_ReturnsDefault()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var value = client.Get("non-existent-config", defaultValue: "my-default");
 
@@ -239,13 +218,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.AddConfig("test-config", "initial");
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var receivedUpdates = new List<(string Name, Config Config)>();
         client.ConfigChanged += (sender, e) =>
@@ -267,13 +242,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         _server.AddConfig("watched-config", "initial");
         _server.AddConfig("other-config", "other");
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var receivedUpdates = new List<ConfigChangedEventArgs>();
         client.ConfigChanged += (sender, e) =>
@@ -290,13 +261,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.AddConfig("test", "value");
 
-        var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
         client.Get<string>("test").Should().Be("value");
 
         client.Close();
@@ -313,12 +280,10 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Required = ["required-1", "required-2"]
         });
 
-        var act = () => client.ConnectAsync();
+        var act = () => client.ConnectAsync(GetConnectOptions());
 
         await act.Should().NotThrowAsync();
     }
@@ -331,12 +296,10 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Required = ["required-1", "required-2"]
         });
 
-        var act = () => client.ConnectAsync();
+        var act = () => client.ConnectAsync(GetConnectOptions());
 
         await act.Should().ThrowAsync<ConfigNotFoundException>();
     }
@@ -350,13 +313,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         // No configs added to server
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.IsInitialized.Should().BeTrue();
     }
@@ -369,13 +328,9 @@ public class ClientIntegrationTests : IAsyncLifetime
             _server.AddConfig($"config-{i}", i);
         }
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         for (var i = 0; i < 100; i++)
         {
@@ -393,13 +348,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         _server.AddConfig("long-config", 9999999999L);
         _server.AddConfig("double-config", 3.14159);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("string-config").Should().Be("hello");
         client.Get<int>("int-config").Should().Be(42);
@@ -414,13 +365,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.AddConfig("null-config", null);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<string?>("null-config");
         result.Should().BeNull();
@@ -431,13 +378,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.AddConfig("list-config", new List<string> { "a", "b", "c" });
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<List<string>>("list-config");
         result.Should().BeEquivalentTo(["a", "b", "c"]);
@@ -453,13 +396,9 @@ public class ClientIntegrationTests : IAsyncLifetime
             ["three"] = 3
         });
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<Dictionary<string, int>>("dict-config");
         result.Should().ContainKey("one").WhoseValue.Should().Be(1);
@@ -473,14 +412,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.SimulateServerError = true;
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
-            InitializationTimeoutMs = 1000
-        });
+        await using var client = new ReplaneClient();
 
-        var act = () => client.ConnectAsync();
+        var act = () => client.ConnectAsync(GetConnectOptions(initTimeoutMs: 1000));
 
         await act.Should().ThrowAsync<Exception>();
     }
@@ -488,11 +422,7 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task IsInitialized_BeforeConnect_ReturnsFalse()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
         client.IsInitialized.Should().BeFalse();
     }
@@ -502,8 +432,6 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["my-config"] = "default" }
         });
 
@@ -515,11 +443,7 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Get_BeforeConnect_WithoutDefault_ThrowsException()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
         var act = () => client.Get<string>("missing-config");
 
@@ -529,13 +453,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Dispose_CanBeCalledMultipleTimes()
     {
-        var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Should not throw
         await client.DisposeAsync();
@@ -563,13 +483,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("equals-test", new ReplaneContext { ["user"] = "guest" }).Should().Be("default");
         client.Get<string>("equals-test", new ReplaneContext { ["user"] = "admin" }).Should().Be("admin-value");
@@ -602,13 +518,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("not-in-test", new ReplaneContext { ["region"] = "blocked-1" }).Should().Be("blocked");
         client.Get<string>("not-in-test", new ReplaneContext { ["region"] = "us-east" }).Should().Be("allowed");
@@ -633,13 +545,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("age-gate", new ReplaneContext { ["age"] = 15 }).Should().Be("restricted");
         client.Get<string>("age-gate", new ReplaneContext { ["age"] = 21 }).Should().Be("adult-content");
@@ -664,13 +572,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("score-reward", new ReplaneContext { ["score"] = 50 }).Should().Be("no-reward");
         client.Get<string>("score-reward", new ReplaneContext { ["score"] = 100 }).Should().Be("reward");
@@ -705,13 +609,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Results should be deterministic
         var result1 = client.Get<string>("ab-test", new ReplaneContext { ["user_id"] = "user-123" });
@@ -761,13 +661,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("and-test", new ReplaneContext { ["a"] = 1 }).Should().Be("default");
         client.Get<string>("and-test", new ReplaneContext { ["b"] = 2 }).Should().Be("default");
@@ -803,13 +699,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("or-test", new ReplaneContext { ["plan"] = "free" }).Should().Be("default");
         client.Get<string>("or-test", new ReplaneContext { ["plan"] = "pro" }).Should().Be("premium");
@@ -841,13 +733,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<string>("not-test", new ReplaneContext { ["status"] = "banned" }).Should().Be("blocked");
         client.Get<string>("not-test", new ReplaneContext { ["status"] = "active" }).Should().Be("allowed");
@@ -878,13 +766,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // First matching override should win
         client.Get<string>("priority-test", new ReplaneContext { ["x"] = 1 }).Should().Be("first-match");
@@ -909,13 +793,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // No context provided - should return default
         client.Get<string>("missing-context-test").Should().Be("default");
@@ -944,12 +824,10 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Context = new ReplaneContext { ["region"] = "us" }  // Default: us
         });
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Default context (us) - no match
         client.Get<string>("context-override-test").Should().Be("default");
@@ -967,15 +845,13 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["override-default"] = "default-value" }
         });
 
         // Before connect, default is used
         client.Get<string>("override-default").Should().Be("default-value");
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // After connect, server value wins
         client.Get<string>("override-default").Should().Be("server-value");
@@ -988,12 +864,10 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["missing-config"] = "default" }
         });
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // Existing config
         client.Get<string>("existing").Should().Be("value");
@@ -1015,13 +889,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("theme", theme);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationThemeConfig>("theme");
 
@@ -1046,13 +916,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("api-config", apiConfig);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationApiConfig>("api-config");
 
@@ -1078,13 +944,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("nested", nested);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationNestedConfig>("nested");
 
@@ -1106,13 +968,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("nullable-config", config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationNullableConfig>("nullable-config");
 
@@ -1133,13 +991,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("nullable-with-values", config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationNullableConfig>("nullable-with-values");
 
@@ -1161,13 +1015,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("theme-list", themes);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<List<IntegrationThemeConfig>>("theme-list");
 
@@ -1188,13 +1038,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig("theme-map", themeMap);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<Dictionary<string, IntegrationThemeConfig>>("theme-map");
 
@@ -1227,13 +1073,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var freeTheme = client.Get<IntegrationThemeConfig>("theme-with-override", new ReplaneContext { ["plan"] = "free" });
         freeTheme!.DarkMode.Should().BeFalse();
@@ -1273,13 +1115,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         client.Get<IntegrationApiConfig>("api-by-region", new ReplaneContext { ["region"] = "ap" })!
             .Endpoint.Should().Be("https://default.api.com");
@@ -1322,13 +1160,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         };
         _server.AddConfig(config);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var controlCount = 0;
         var treatmentCount = 0;
@@ -1347,13 +1181,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Get_ComplexTypeNotFound_WithDefault_ReturnsDefault()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var defaultTheme = new IntegrationThemeConfig { DarkMode = true, PrimaryColor = "#DEFAULT", FontSize = 10 };
         var result = client.Get("missing-theme", defaultValue: defaultTheme);
@@ -1366,13 +1196,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Get_ComplexTypeNotFound_ThrowsException()
     {
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var act = () => client.Get<IntegrationThemeConfig>("missing-theme");
 
@@ -1386,8 +1212,6 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["theme"] = defaultTheme }
         });
 
@@ -1406,15 +1230,13 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient(new ReplaneClientOptions
         {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey,
             Defaults = new Dictionary<string, object?> { ["theme"] = defaultTheme }
         });
 
         // Before connect - default
         client.Get<IntegrationThemeConfig>("theme")!.PrimaryColor.Should().Be("#DEFAULT");
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         // After connect - server value
         client.Get<IntegrationThemeConfig>("theme")!.PrimaryColor.Should().Be("#SERVER");
@@ -1426,13 +1248,9 @@ public class ClientIntegrationTests : IAsyncLifetime
         var emptyTheme = new IntegrationThemeConfig();
         _server.AddConfig("empty-theme", emptyTheme);
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var result = client.Get<IntegrationThemeConfig>("empty-theme");
 
@@ -1447,13 +1265,9 @@ public class ClientIntegrationTests : IAsyncLifetime
     {
         _server.AddConfig("watched-theme", new IntegrationThemeConfig { DarkMode = false, PrimaryColor = "#INITIAL", FontSize = 12 });
 
-        await using var client = new ReplaneClient(new ReplaneClientOptions
-        {
-            BaseUrl = _server.BaseUrl,
-            SdkKey = _server.SdkKey
-        });
+        await using var client = new ReplaneClient();
 
-        await client.ConnectAsync();
+        await client.ConnectAsync(GetConnectOptions());
 
         var receivedTheme = (IntegrationThemeConfig?)null;
         client.ConfigChanged += (sender, e) =>

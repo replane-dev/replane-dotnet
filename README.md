@@ -18,14 +18,14 @@ dotnet add package Replane
 ```csharp
 using Replane;
 
-// Create and connect
-await using var replane = new ReplaneClient(new ReplaneClientOptions
+// Create client and connect with connection options
+await using var replane = new ReplaneClient();
+
+await replane.ConnectAsync(new ConnectOptions
 {
     BaseUrl = "https://your-replane-server.com",
     SdkKey = "your-sdk-key"
 });
-
-await replane.ConnectAsync();
 
 // Get a config value
 var featureEnabled = replane.Get<bool>("feature-enabled");
@@ -160,8 +160,6 @@ Provide default values for when configs aren't loaded:
 ```csharp
 var replane = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = "https://your-server.com",
-    SdkKey = "your-key",
     Defaults = new Dictionary<string, object?>
     {
         ["feature-enabled"] = false,
@@ -177,13 +175,15 @@ Ensure specific configs are present on initialization:
 ```csharp
 var replane = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = "https://your-server.com",
-    SdkKey = "your-key",
     Required = ["essential-config", "api-endpoint"]
 });
 
 // ConnectAsync will throw if required configs are missing
-await replane.ConnectAsync();
+await replane.ConnectAsync(new ConnectOptions
+{
+    BaseUrl = "https://your-server.com",
+    SdkKey = "your-key"
+});
 ```
 
 ## Testing
@@ -444,21 +444,32 @@ public void TestFeatureService()
 
 ## Configuration Options
 
-| Option                    | Type                          | Default  | Description                     |
-| ------------------------- | ----------------------------- | -------- | ------------------------------- |
-| `BaseUrl`                 | `string`                      | required | Replane server URL              |
-| `SdkKey`                  | `string`                      | required | SDK key for authentication      |
-| `Context`                 | `ReplaneContext`              | `null`   | Default context for evaluations |
-| `Defaults`                | `Dictionary<string, object?>` | `null`   | Default values                  |
-| `Required`                | `IReadOnlyList<string>`       | `null`   | Required config names           |
-| `RequestTimeoutMs`        | `int`                         | `2000`   | HTTP request timeout            |
-| `InitializationTimeoutMs` | `int`                         | `5000`   | Initial connection timeout      |
-| `RetryDelayMs`            | `int`                         | `200`    | Initial retry delay             |
-| `InactivityTimeoutMs`     | `int`                         | `30000`  | SSE inactivity timeout          |
-| `HttpClient`              | `HttpClient`                  | `null`   | Custom HttpClient               |
-| `Debug`                   | `bool`                        | `false`  | Enable debug logging            |
-| `Logger`                  | `IReplaneLogger`              | `null`   | Custom logger implementation    |
-| `Agent`                   | `string`                      | `null`   | Agent identifier for User-Agent |
+### ReplaneClientOptions
+
+Options passed to the constructor. Connection options are provided via `ConnectAsync`.
+
+| Option       | Type                          | Default | Description                     |
+| ------------ | ----------------------------- | ------- | ------------------------------- |
+| `Context`    | `ReplaneContext`              | `null`  | Default context for evaluations |
+| `Defaults`   | `Dictionary<string, object?>` | `null`  | Default values                  |
+| `Required`   | `IReadOnlyList<string>`       | `null`  | Required config names           |
+| `HttpClient` | `HttpClient`                  | `null`  | Custom HttpClient               |
+| `Debug`      | `bool`                        | `false` | Enable debug logging            |
+| `Logger`     | `IReplaneLogger`              | `null`  | Custom logger implementation    |
+
+### ConnectOptions
+
+Connection options passed to `ConnectAsync`.
+
+| Option                    | Type     | Default  | Description                |
+| ------------------------- | -------- | -------- | -------------------------- |
+| `BaseUrl`                 | `string` | required | Replane server URL         |
+| `SdkKey`                  | `string` | required | SDK key for authentication |
+| `RequestTimeoutMs`        | `int`    | `2000`   | HTTP request timeout       |
+| `InitializationTimeoutMs` | `int`    | `5000`   | Initial connection timeout |
+| `RetryDelayMs`            | `int`    | `200`    | Initial retry delay        |
+| `InactivityTimeoutMs`     | `int`    | `30000`  | SSE inactivity timeout     |
+| `Agent`                   | `string` | `null`   | Agent identifier           |
 
 ## Debug Logging
 
@@ -467,9 +478,13 @@ Enable debug logging to troubleshoot issues:
 ```csharp
 var replane = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = "https://your-server.com",
-    SdkKey = "your-key",
     Debug = true
+});
+
+await replane.ConnectAsync(new ConnectOptions
+{
+    BaseUrl = "https://your-server.com",
+    SdkKey = "your-key"
 });
 ```
 

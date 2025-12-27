@@ -1,16 +1,8 @@
 using Replane;
 
-// Configure the Replane client
+// Configure the Replane client with defaults
 var client = new ReplaneClient(new ReplaneClientOptions
 {
-    // Replace with your Replane server URL
-    BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
-              ?? "https://your-replane-server.com",
-
-    // Replace with your SDK key
-    SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
-             ?? "your-sdk-key",
-
     // Optional: Default values if server is unavailable
     Defaults = new Dictionary<string, object?>
     {
@@ -21,9 +13,18 @@ var client = new ReplaneClient(new ReplaneClientOptions
 
 try
 {
-    // Connect to the Replane server
+    // Connect to the Replane server with connection options
     Console.WriteLine("Connecting to Replane server...");
-    await client.ConnectAsync();
+    await client.ConnectAsync(new ConnectOptions
+    {
+        // Replace with your Replane server URL
+        BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
+                  ?? "https://your-replane-server.com",
+
+        // Replace with your SDK key
+        SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
+                 ?? "your-sdk-key"
+    });
     Console.WriteLine("Connected successfully!");
 
     // Read some config values

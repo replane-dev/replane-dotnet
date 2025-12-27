@@ -54,9 +54,11 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
     private readonly IReplaneLogger _logger;
-    private readonly string _agent;
 
     private readonly ConcurrentDictionary<string, Config> _configs = new(StringComparer.Ordinal);
+
+    // Connection options (set at connect time)
+    private ConnectOptions? _connectOptions;
 
     private bool _closed;
     private bool _initialized;
@@ -73,36 +75,29 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
     /// <summary>
     /// Creates a new Replane client.
     /// </summary>
-    public ReplaneClient(ReplaneClientOptions options)
+    public ReplaneClient(ReplaneClientOptions? options = null)
     {
-        _options = options;
-        _logger = options.Logger ?? (options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
-        _agent = options.Agent ?? DefaultAgent;
+        _options = options ?? new ReplaneClientOptions();
+        _logger = _options.Logger ?? (_options.Debug ? ConsoleReplaneLogger.Instance : NullReplaneLogger.Instance);
 
         _logger.LogDebug($"Initializing ReplaneClient with options:");
-        _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");
-        _logger.LogDebug($"  SdkKey: {MaskSdkKey(options.SdkKey)}");
-        _logger.LogDebug($"  RequestTimeoutMs: {options.RequestTimeoutMs}");
-        _logger.LogDebug($"  InitializationTimeoutMs: {options.InitializationTimeoutMs}");
-        _logger.LogDebug($"  RetryDelayMs: {options.RetryDelayMs}");
-        _logger.LogDebug($"  InactivityTimeoutMs: {options.InactivityTimeoutMs}");
-        _logger.LogDebug($"  Debug: {options.Debug}");
-        if (options.Context != null && options.Context.Count > 0)
+        _logger.LogDebug($"  Debug: {_options.Debug}");
+        if (_options.Context != null && _options.Context.Count > 0)
         {
-            _logger.LogDebug($"  Default context: {FormatContext(options.Context)}");
+            _logger.LogDebug($"  Default context: {FormatContext(_options.Context)}");
         }
-        if (options.Defaults != null && options.Defaults.Count > 0)
+        if (_options.Defaults != null && _options.Defaults.Count > 0)
         {
-            _logger.LogDebug($"  Defaults: [{string.Join(", ", options.Defaults.Keys)}]");
+            _logger.LogDebug($"  Defaults: [{string.Join(", ", _options.Defaults.Keys)}]");
         }
-        if (options.Required != null && options.Required.Count > 0)
+        if (_options.Required != null && _options.Required.Count > 0)
         {
-            _logger.LogDebug($"  Required configs: [{string.Join(", ", options.Required)}]");
+            _logger.LogDebug($"  Required configs: [{string.Join(", ", _options.Required)}]");
         }
 
-        if (options.HttpClient != null)
+        if (_options.HttpClient != null)
         {
-            _httpClient = options.HttpClient;
+            _httpClient = _options.HttpClient;
             _ownsHttpClient = false;
             _logger.LogDebug("  Using provided HttpClient");
         }
@@ -117,9 +112,9 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         }
 
         // Initialize defaults
-        if (options.Defaults != null)
+        if (_options.Defaults != null)
         {
-            foreach (var (name, value) in options.Defaults)
+            foreach (var (name, value) in _options.Defaults)
             {
                 var jsonValue = JsonValueConverter.ToJsonElement(value);
                 _configs[name] = new Config { Name = name, Value = jsonValue };
@@ -138,19 +133,30 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
     /// <summary>
     /// Connect to the Replane server and start receiving updates.
     /// </summary>
+    /// <param name="options">Connection options including BaseUrl and SdkKey.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(ConnectOptions options, CancellationToken cancellationToken = default)
     {
         if (_closed)
         {
             throw new ClientClosedException();
         }
 
+        _connectOptions = options;
+
+        _logger.LogDebug($"Connecting with options:");
+        _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");
+        _logger.LogDebug($"  SdkKey: {MaskSdkKey(options.SdkKey)}");
+        _logger.LogDebug($"  RequestTimeoutMs: {options.RequestTimeoutMs}");
+        _logger.LogDebug($"  InitializationTimeoutMs: {options.InitializationTimeoutMs}");
+        _logger.LogDebug($"  RetryDelayMs: {options.RetryDelayMs}");
+        _logger.LogDebug($"  InactivityTimeoutMs: {options.InactivityTimeoutMs}");
+
         _streamCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _streamTask = RunStreamAsync(_streamCts.Token);
 
         // Wait for initialization
-        using var timeoutCts = new CancellationTokenSource(_options.InitializationTimeoutMs);
+        using var timeoutCts = new CancellationTokenSource(options.InitializationTimeoutMs);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
@@ -160,8 +166,8 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
             throw new ReplaneTimeoutException(
-                $"Initialization timed out after {_options.InitializationTimeoutMs}ms",
-                _options.InitializationTimeoutMs);
+                $"Initialization timed out after {options.InitializationTimeoutMs}ms",
+                options.InitializationTimeoutMs);
         }
 
         if (_initError != null)
@@ -333,7 +339,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
 
             // Exponential backoff
             retryCount = Math.Min(retryCount + 1, maxRetries);
-            var delay = TimeSpan.FromMilliseconds(_options.RetryDelayMs * Math.Pow(2, retryCount - 1));
+            var delay = TimeSpan.FromMilliseconds(_connectOptions!.RetryDelayMs * Math.Pow(2, retryCount - 1));
             delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, 30000));
 
             _logger.LogDebug($"Reconnecting in {delay.TotalSeconds:F1} seconds...");
@@ -351,19 +357,20 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
 
     private async Task ConnectStreamAsync(CancellationToken cancellationToken)
     {
-        var baseUrl = _options.BaseUrl.TrimEnd('/');
+        var options = _connectOptions!;
+        var baseUrl = options.BaseUrl.TrimEnd('/');
         var requestUrl = $"{baseUrl}/api/sdk/v1/replication/stream";
 
         _logger.LogDebug($"Connecting to SSE: {requestUrl}");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.SdkKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.SdkKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true };
-        request.Headers.UserAgent.ParseAdd(_agent);
+        request.Headers.UserAgent.ParseAdd(options.Agent ?? DefaultAgent);
         request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
-        using var timeoutCts = new CancellationTokenSource(_options.RequestTimeoutMs);
+        using var timeoutCts = new CancellationTokenSource(options.RequestTimeoutMs);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         HttpResponseMessage response;
@@ -376,7 +383,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            throw new ReplaneTimeoutException($"Request timed out after {_options.RequestTimeoutMs}ms", _options.RequestTimeoutMs);
+            throw new ReplaneTimeoutException($"Request timed out after {options.RequestTimeoutMs}ms", options.RequestTimeoutMs);
         }
 
         using (response)
@@ -415,7 +422,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         while (!cancellationToken.IsCancellationRequested)
         {
             // Reset inactivity timer before each read
-            inactivityCts.CancelAfter(_options.InactivityTimeoutMs);
+            inactivityCts.CancelAfter(_connectOptions!.InactivityTimeoutMs);
 
             int bytesRead;
             try
@@ -424,7 +431,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
             }
             catch (OperationCanceledException) when (inactivityCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                _logger.LogDebug($"SSE inactivity timeout after {_options.InactivityTimeoutMs}ms, reconnecting...");
+                _logger.LogDebug($"SSE inactivity timeout after {_connectOptions.InactivityTimeoutMs}ms, reconnecting...");
                 break;
             }
             catch (ObjectDisposedException)

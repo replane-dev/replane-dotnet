@@ -9,12 +9,9 @@ Console.WriteLine("===========================");
 Console.WriteLine($"Base URL: {baseUrl}");
 Console.WriteLine();
 
-var options = new ReplaneClientOptions
+var clientOptions = new ReplaneClientOptions
 {
-    BaseUrl = baseUrl,
-    SdkKey = sdkKey,
     Debug = true,
-    InitializationTimeoutMs = 1000,
     // Defaults for when server is unavailable
     Defaults = new Dictionary<string, object?>
     {
@@ -23,7 +20,14 @@ var options = new ReplaneClientOptions
     }
 };
 
-await using var client = new ReplaneClient(options);
+var connectOptions = new ConnectOptions
+{
+    BaseUrl = baseUrl,
+    SdkKey = sdkKey,
+    InitializationTimeoutMs = 1000
+};
+
+await using var client = new ReplaneClient(clientOptions);
 
 // Subscribe to config changes
 client.ConfigChanged += (sender, e) =>
@@ -36,7 +40,7 @@ client.ConfigChanged += (sender, e) =>
 try
 {
     Console.WriteLine("Connecting to Replane server...");
-    await client.ConnectAsync();
+    await client.ConnectAsync(connectOptions);
     Console.WriteLine("Connected!");
     Console.WriteLine();
 

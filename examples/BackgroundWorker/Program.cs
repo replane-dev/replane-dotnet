@@ -6,10 +6,6 @@ Console.WriteLine("This example demonstrates real-time config updates.\n");
 // Create the client
 await using var client = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
-              ?? "https://your-replane-server.com",
-    SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
-             ?? "your-sdk-key",
     Defaults = new Dictionary<string, object?>
     {
         ["worker-enabled"] = true,
@@ -35,7 +31,13 @@ client.ConfigChanged += (sender, e) =>
 try
 {
     Console.WriteLine("Connecting to Replane...");
-    await client.ConnectAsync();
+    await client.ConnectAsync(new ConnectOptions
+    {
+        BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
+                  ?? "https://your-replane-server.com",
+        SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
+                 ?? "your-sdk-key"
+    });
     Console.WriteLine("Connected! Subscribed to config changes.\n");
 }
 catch (ReplaneException ex)

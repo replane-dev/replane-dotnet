@@ -5,12 +5,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Create and configure the Replane client as a singleton
 var replaneClient = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = builder.Configuration["Replane:BaseUrl"]
-              ?? Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
-              ?? "https://your-replane-server.com",
-    SdkKey = builder.Configuration["Replane:SdkKey"]
-             ?? Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
-             ?? "your-sdk-key",
     Defaults = new Dictionary<string, object?>
     {
         ["api-rate-limit"] = 100,
@@ -28,7 +22,15 @@ var app = builder.Build();
 // Connect to Replane during startup
 try
 {
-    await replaneClient.ConnectAsync();
+    await replaneClient.ConnectAsync(new ConnectOptions
+    {
+        BaseUrl = builder.Configuration["Replane:BaseUrl"]
+                  ?? Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
+                  ?? "https://your-replane-server.com",
+        SdkKey = builder.Configuration["Replane:SdkKey"]
+                 ?? Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
+                 ?? "your-sdk-key"
+    });
     app.Logger.LogInformation("Connected to Replane server");
 }
 catch (ReplaneException ex)

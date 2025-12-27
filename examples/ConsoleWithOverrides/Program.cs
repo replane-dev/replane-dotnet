@@ -6,11 +6,6 @@ Console.WriteLine("=== Replane Context & Overrides Example ===\n");
 // This context is merged with per-request context
 await using var client = new ReplaneClient(new ReplaneClientOptions
 {
-    BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
-              ?? "https://your-replane-server.com",
-    SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
-             ?? "your-sdk-key",
-
     // Default context - applied to all config reads
     Context = new ReplaneContext
     {
@@ -29,7 +24,13 @@ await using var client = new ReplaneClient(new ReplaneClientOptions
 
 try
 {
-    await client.ConnectAsync();
+    await client.ConnectAsync(new ConnectOptions
+    {
+        BaseUrl = Environment.GetEnvironmentVariable("REPLANE_BASE_URL")
+                  ?? "https://your-replane-server.com",
+        SdkKey = Environment.GetEnvironmentVariable("REPLANE_SDK_KEY")
+                 ?? "your-sdk-key"
+    });
     Console.WriteLine("Connected to Replane server.\n");
 }
 catch (ReplaneException ex)
