@@ -18,12 +18,12 @@ dotnet add package Replane
 ```csharp
 using Replane;
 
-// Create client and connect with connection options
+// Create client and connect
 await using var replane = new ReplaneClient();
 
 await replane.ConnectAsync(new ConnectOptions
 {
-    BaseUrl = "https://your-replane-server.com",
+    BaseUrl = "https://cloud.replane.dev", // or your self-hosted URL
     SdkKey = "your-sdk-key"
 });
 
@@ -31,6 +31,8 @@ await replane.ConnectAsync(new ConnectOptions
 var featureEnabled = replane.Get<bool>("feature-enabled");
 var maxItems = replane.Get<int>("max-items", defaultValue: 100);
 ```
+
+> **Tip:** Get started instantly with [Replane Cloud](https://cloud.replane.dev) — no infrastructure required.
 
 ## Features
 
