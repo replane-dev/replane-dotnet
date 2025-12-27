@@ -24,7 +24,7 @@ var connectOptions = new ConnectOptions
 {
     BaseUrl = baseUrl,
     SdkKey = sdkKey,
-    InitializationTimeoutMs = 1000
+    ConnectionTimeoutMs = 1000
 };
 
 await using var client = new ReplaneClient(clientOptions);

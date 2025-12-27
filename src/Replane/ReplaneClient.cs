@@ -148,7 +148,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         _logger.LogDebug($"  BaseUrl: {options.BaseUrl}");
         _logger.LogDebug($"  SdkKey: {MaskSdkKey(options.SdkKey)}");
         _logger.LogDebug($"  RequestTimeoutMs: {options.RequestTimeoutMs}");
-        _logger.LogDebug($"  InitializationTimeoutMs: {options.InitializationTimeoutMs}");
+        _logger.LogDebug($"  ConnectionTimeoutMs: {options.ConnectionTimeoutMs}");
         _logger.LogDebug($"  RetryDelayMs: {options.RetryDelayMs}");
         _logger.LogDebug($"  InactivityTimeoutMs: {options.InactivityTimeoutMs}");
 
@@ -156,7 +156,7 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         _streamTask = RunStreamAsync(_streamCts.Token);
 
         // Wait for initialization
-        using var timeoutCts = new CancellationTokenSource(options.InitializationTimeoutMs);
+        using var timeoutCts = new CancellationTokenSource(options.ConnectionTimeoutMs);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
@@ -166,8 +166,8 @@ public sealed class ReplaneClient : IReplaneClient, IAsyncDisposable
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
             throw new ReplaneTimeoutException(
-                $"Initialization timed out after {options.InitializationTimeoutMs}ms",
-                options.InitializationTimeoutMs);
+                $"Connection timed out after {options.ConnectionTimeoutMs}ms",
+                options.ConnectionTimeoutMs);
         }
 
         if (_initError != null)

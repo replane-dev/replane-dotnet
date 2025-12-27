@@ -15,7 +15,7 @@ public sealed class ConnectOptions
     public int RequestTimeoutMs { get; init; } = 2000;
 
     /// <summary>Timeout for initial connection in milliseconds. Default: 5000ms.</summary>
-    public int InitializationTimeoutMs { get; init; } = 5000;
+    public int ConnectionTimeoutMs { get; init; } = 5000;
 
     /// <summary>Initial delay between retries in milliseconds. Default: 200ms.</summary>
     public int RetryDelayMs { get; init; } = 200;

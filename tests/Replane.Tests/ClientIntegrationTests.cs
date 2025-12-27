@@ -39,11 +39,11 @@ public class ClientIntegrationTests : IAsyncLifetime
     private MockReplaneServer _server = null!;
 
     // Helper to create ConnectOptions from server
-    private ConnectOptions GetConnectOptions(int? initTimeoutMs = null, string? sdkKey = null) => new ConnectOptions
+    private ConnectOptions GetConnectOptions(int? connectionTimeoutMs = null, string? sdkKey = null) => new ConnectOptions
     {
         BaseUrl = _server.BaseUrl,
         SdkKey = sdkKey ?? _server.SdkKey,
-        InitializationTimeoutMs = initTimeoutMs ?? 5000
+        ConnectionTimeoutMs = connectionTimeoutMs ?? 5000
     };
 
     public async Task InitializeAsync()
@@ -105,7 +105,7 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient();
 
-        var act = () => client.ConnectAsync(GetConnectOptions(initTimeoutMs: 100));
+        var act = () => client.ConnectAsync(GetConnectOptions(connectionTimeoutMs: 100));
 
         await act.Should().ThrowAsync<ReplaneTimeoutException>();
     }
@@ -414,7 +414,7 @@ public class ClientIntegrationTests : IAsyncLifetime
 
         await using var client = new ReplaneClient();
 
-        var act = () => client.ConnectAsync(GetConnectOptions(initTimeoutMs: 1000));
+        var act = () => client.ConnectAsync(GetConnectOptions(connectionTimeoutMs: 1000));
 
         await act.Should().ThrowAsync<Exception>();
     }
