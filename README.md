@@ -1,11 +1,30 @@
-# Replane .NET SDK
+<h1 align="center">Replane .NET SDK</h1>
+<p align="center">Dynamic configuration for .NET applications.</p>
 
-Official .NET SDK for [Replane](https://replane.dev) - Feature flags and remote configuration.
+<p align="center">
+  <a href="https://cloud.replane.dev"><img src="https://img.shields.io/badge/Try-Replane%20Cloud-blue" alt="Replane Cloud"></a>
+  <a href="https://www.nuget.org/packages/Replane"><img src="https://img.shields.io/nuget/v/Replane" alt="NuGet"></a>
+  <a href="https://github.com/replane-dev/replane-dotnet/actions"><img src="https://github.com/replane-dev/replane-dotnet/actions/workflows/publish.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/replane-dev/replane-dotnet/blob/main/LICENSE"><img src="https://img.shields.io/github/license/replane-dev/replane-dotnet" alt="License"></a>
+  <a href="https://github.com/orgs/replane-dev/discussions"><img src="https://img.shields.io/badge/discussions-join-blue?logo=github" alt="Community"></a>
+</p>
 
-[![NuGet](https://img.shields.io/nuget/v/Replane)](https://www.nuget.org/packages/Replane)
-[![CI](https://github.com/replane-dev/replane-dotnet/actions/workflows/publish.yml/badge.svg)](https://github.com/replane-dev/replane-dotnet/actions)
-[![License](https://img.shields.io/github/license/replane-dev/replane-dotnet)](https://github.com/replane-dev/replane-dotnet/blob/main/LICENSE)
-[![Community](https://img.shields.io/badge/discussions-join-blue?logo=github)](https://github.com/orgs/replane-dev/discussions)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/replane-dev/replane/main/public/replane-window-screenshot-dark-v1.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/replane-dev/replane/main/public/replane-window-screenshot-light-with-border-v2.jpg">
+    <img alt="Replane Screenshot" src="https://raw.githubusercontent.com/replane-dev/replane/main/public/replane-window-screenshot-light-with-border-v2.jpg">
+</picture>
+
+[Replane](https://github.com/replane-dev/replane) is a dynamic configuration manager. Store feature flags, app settings, and operational config in one place—with version history, optional approvals, and realtime sync to your services. No redeploys needed.
+
+## Why Dynamic Configuration?
+
+- **Feature flags** – toggle features, run A/B tests, roll out to user segments
+- **Operational tuning** – adjust limits, TTLs, and timeouts without redeploying
+- **Per-environment settings** – different values for production, staging, dev
+- **Incident response** – instantly revert to a known-good version
+- **Cross-service configuration** – share settings with realtime sync
+- **Non-engineer access** – safe editing with schema validation
 
 ## Installation
 
@@ -31,8 +50,6 @@ await replane.ConnectAsync(new ConnectOptions
 var featureEnabled = replane.Get<bool>("feature-enabled");
 var maxItems = replane.Get<int>("max-items", defaultValue: 100);
 ```
-
-> **Tip:** Get started instantly with [Replane Cloud](https://cloud.replane.dev) — no infrastructure required.
 
 ## Features
 
