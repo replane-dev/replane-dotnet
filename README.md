@@ -15,7 +15,7 @@
     <img alt="Replane Screenshot" src="https://raw.githubusercontent.com/replane-dev/replane/main/public/replane-window-screenshot-light-with-border-v2.jpg">
 </picture>
 
-[Replane](https://github.com/replane-dev/replane) is a dynamic configuration manager. Store feature flags, app settings, and operational config in one place—with version history, optional approvals, and realtime sync to your services. No redeploys needed.
+[Replane](https://github.com/replane-dev/replane) is a dynamic configuration manager that lets you tweak your software without running scripts or building your own admin panel. Store feature flags, rate limits, UI text, log level, rollout percentage, and more. Delegate editing to teammates and share config across services. No redeploys needed.
 
 ## Why Dynamic Configuration?
 
