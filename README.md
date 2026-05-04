@@ -2,7 +2,6 @@
 <p align="center">Dynamic configuration for .NET applications.</p>
 
 <p align="center">
-  <a href="https://cloud.replane.dev"><img src="https://img.shields.io/badge/Try-Replane%20Cloud-blue" alt="Replane Cloud"></a>
   <a href="https://www.nuget.org/packages/Replane"><img src="https://img.shields.io/nuget/v/Replane" alt="NuGet"></a>
   <a href="https://github.com/replane-dev/replane-dotnet/actions"><img src="https://github.com/replane-dev/replane-dotnet/actions/workflows/publish.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/replane-dev/replane-dotnet/blob/main/LICENSE"><img src="https://img.shields.io/github/license/replane-dev/replane-dotnet" alt="License"></a>
@@ -42,7 +41,7 @@ await using var replane = new ReplaneClient();
 
 await replane.ConnectAsync(new ConnectOptions
 {
-    BaseUrl = "https://cloud.replane.dev", // or your self-hosted URL
+    BaseUrl = "https://replane.example.com",
     SdkKey = "your-sdk-key"
 });
 
